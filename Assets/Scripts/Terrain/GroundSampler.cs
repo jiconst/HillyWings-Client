@@ -26,7 +26,9 @@ namespace HillyWings
         private readonly System.Random rng;
         private readonly List<ControlPoint> points = new List<ControlPoint>();
         private readonly float baseY;
+        private readonly float viewHeight; // 전환 구간 진폭 계산용
         private float lastDirection = -1f;
+        private int lastTransitionedBoundary; // 마지막으로 전환 구간을 삽입한 섬 경계 인덱스
 
         // 초반 (Island 1) 파라미터 — 좁은 범위, 일정한 리듬
         private readonly float easyMinHalfWave;
@@ -41,7 +43,15 @@ namespace HillyWings
 
         // 이 섬 수만큼 지나면 최고 난이도 도달 (0-indexed 기준: 5 = Island 6 이후 완전 최고)
         private const float MaxDifficultyIslands = 5f;
-        private const float IslandLength = 5000f;
+        // GameManager.IslandLength / CoinField.IslandLength 와 반드시 동기화 유지
+        private const float IslandLength = 25000f;
+
+        // 섬 끝 전환 구간 파라미터 — 골짜기(가속) → 발사대(발사) 강제 지형
+        private const float TransitionTriggerDist  = 2500f;  // 경계 앞 이 거리에 들어오면 삽입 시작
+        private const float TransitionValleyOffset = 1200f;  // 경계 앞 이 거리에 골짜기 바닥 배치
+        private const float TransitionPeakOffset   = 200f;   // 경계 앞 이 거리에 발사대 정점 배치
+        private const float TransitionValleyAmpRatio = 0.26f; // 골짜기 깊이 (viewHeight 대비 비율)
+        private const float TransitionPeakAmpRatio   = 0.24f; // 발사대 높이 (viewHeight 대비 비율)
 
         public float BaseY => baseY;
         // 색상 그라디언트 기준은 최고 난이도 진폭 — 전체 런에서 일관된 색 밴딩
@@ -50,6 +60,7 @@ namespace HillyWings
         public GroundSampler(int seed, float viewHeight)
         {
             rng = new System.Random(seed);
+            this.viewHeight = viewHeight;
             baseY = viewHeight * 0.66f;
 
             // Island 1-2: 반파장·진폭 모두 좁은 범위 → 일정한 리듬, 초보자도 패턴 파악 가능
@@ -92,9 +103,32 @@ namespace HillyWings
         {
             while (points[points.Count - 1].X < upToX)
             {
+                float curX = points[points.Count - 1].X;
+
+                // 섬 경계 앞 전환 구간 감지 — 골짜기(가속) + 발사대(발사) 강제 삽입.
+                // 이 구간에서 새는 급경사 내리막으로 속도를 쌓고, 가파른 오르막 발사대에서
+                // 다음 섬으로 강하게 날아간다. "야호!" 사운드와 함께 연출.
+                int nextBIdx = Mathf.Max(1, Mathf.CeilToInt(curX / IslandLength));
+                float nextBX = nextBIdx * IslandLength;
+                if (lastTransitionedBoundary < nextBIdx && nextBX - curX < TransitionTriggerDist)
+                {
+                    float valleyX = nextBX - TransitionValleyOffset;
+                    float peakX   = nextBX - TransitionPeakOffset;
+                    if (valleyX > curX)
+                    {
+                        // 깊은 골짜기: canvas-y 증가 = 아래 방향, 빠른 다이브로 속도 급상승
+                        points.Add(new ControlPoint { X = valleyX, Y = baseY + TransitionValleyAmpRatio * viewHeight });
+                        // 발사대: 급경사 오르막, LaunchSlopeThreshold 초과로 새를 높이 발사
+                        points.Add(new ControlPoint { X = peakX,   Y = baseY - TransitionPeakAmpRatio  * viewHeight });
+                        // 전환 이후 다음 일반 포인트 방향을 골짜기(아래)로 초기화
+                        lastDirection = 1f;
+                    }
+                    lastTransitionedBoundary = nextBIdx;
+                    continue;
+                }
+
                 // 현재 생성 위치를 섬 번호로 환산해 난이도 보간
                 // (GameManager 의존 없이 X 좌표에서 직접 계산)
-                float curX = points[points.Count - 1].X;
                 float islandIdx = Mathf.Max(0f, curX / IslandLength);
                 float t = Mathf.Clamp01(islandIdx / MaxDifficultyIslands);
 

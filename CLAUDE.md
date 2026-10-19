@@ -10,6 +10,77 @@ Tiny Wings 스타일의 원버튼 슬라이딩 게임을 Unity(C#)로 개발한�
 오르막 정점에서 떼서 발사 → 착지 타이밍을 맞춰 "Great Slide" 연출. 하루(제한시간) 동안
 최대한 멀리 날아 점수를 쌓는다.
 
+## 게임 방법 (플레이어 가이드)
+
+- **화면 누르기**: 내리막에서 빠르게 하강 (누르고 있는 동안 가속)
+- **손 떼기**: 오르막 정점 부근에서 손을 떼면 하늘로 발사
+- **Great Slide**: 다이빙 직후 착지 성공 시 획득
+- **Fever Mode**: Great Slide 3연속 → 점수 2배 (5초, 최대 20초 연장)
+- **코인 수집**: 노란 코인(+3점), 파란 스피드코인(속도 부스트)
+- **클라우드 터치**: 공중에서 구름 터치 시 +20점
+- **Sky Flight Orb**: 초록 오브 획득 시 5.5초 하늘 비행
+- **섬 전환 연출**: 섬 끝 발사대 오르막에서 "야호!" 사운드와 함께 다음 섬으로 도약
+
+## 설치 및 실행
+
+- **Unity 6000.5.7f1** (2D URP 템플릿), iOS / Android 빌드 지원
+
+1. Unity Hub에서 `HillyWings-Client/` 폴더 열기
+2. **Window > TextMeshPro > Import TMP Essential Resources** 1회 실행 (필수 — 한글 렌더링)
+3. Play 버튼 — 모든 씬/오브젝트는 코드로 자동 생성됨
+
+**URP 사용 시**: `TerrainGenerator` 인스펙터 `Shader Name` →
+`Universal Render Pipeline/2D/Sprite-Lit-Default`
+
+**온라인 기능(선택)**: `~/src/HillyWings-Server`에서 `docker compose up --build`,
+기본 접속 URL `http://localhost:8000` — 서버를 안 띄워도 게임은 100% 오프라인 동작
+
+## 밸런스 수치 빠른 참조
+
+### 낮/밤 사이클 속도 연동
+
+| 속도 | 낮 진행 배율 | 체감 하루 길이 |
+|------|------------|-------------|
+| 300 (저속) | 1.12× | ~80초 (더 빨리 밤이 옴) |
+| 360 (기준) | 1.00× | 90초 |
+| 500 | 0.72× | ~125초 |
+| 700 | 0.32× | ~280초 |
+| 900+ | **음수** | 해가 뒤로 밀림 |
+
+### 급경사 언덕 페널티 (`UphillDecelRate = 300`)
+
+| 구분 | 임계 경사 | 초당 감속 | 체감 |
+|------|---------|---------|------|
+| 완만한 오르막 (< 0.18) | 페널티 없음 | 0 | 정상 주행 |
+| 보통 오르막 (0.3) | 0.12 초과분 | 36/s | 살짝 느려짐 |
+| 급경사 (1.0) | 0.82 초과분 | 246/s | 빠르게 감속 |
+| Island 6+ 최대 (1.44) | 1.26 초과분 | 378/s | 저속 시 SpeedMin 도달 |
+
+### 지형 난이도 커브
+
+| 섬 | 반파장 범위 | 진폭 범위 | 체감 |
+|----|-----------|---------|------|
+| Island 1 | 0.40~0.44 × H | 0.11~0.13 × H | 일정한 리듬, 패턴 예측 쉬움 |
+| Island 3 | 0.34~0.54 × H | 0.09~0.17 × H | 불규칙해지기 시작 |
+| Island 6+ | 0.24~0.60 × H | 0.08~0.22 × H | 짧은 급경사 + 긴 완만한 언덕 혼재 |
+
+`IslandLength = 25000` (기본 속도 기준 섬 하나 약 69초) / `MaxDifficultyIslands = 5`
+
+### Tiny Wings 분석 기반 적용 사항
+
+| 항목 | HillyWings 적용 |
+|---|---|
+| TODAY 모드 | `GameManager.TodaySeed()` — UTC 날짜 기반 |
+| 섬 도달 배너 | `HUD.cs` 슬라이드인 파란 배너 |
+| Great Slide 3연속 → Fever | `SlideJudge.feverTriggerStreak = 3` |
+| 점수 배수 | `10 + NestBonus + (Island-1)*2` |
+| 이동 거리 점수 트리클 | `BirdController.distanceScoreRate = 0.005f` |
+| 속도 연동 낮 연장 | `DayCycle.speedInfluence = 0.002f` |
+| 진행형 지형 난이도 | `GroundSampler` easy→hard 커브 |
+| 급경사 언덕 장애물 | `BirdPhysics.UphillDecelRate = 300` |
+| 슬라이드 설명 슬라이드 | `HowToPlay` 4페이지 ([이전]/[다음]) |
+| 미니멀 HUD | `showDebugHud = false` 기본값 |
+
 ## 개발 환경 및 규칙
 
 - **Unity 6000.5.7f1**, C# 10, 2D URP 템플릿

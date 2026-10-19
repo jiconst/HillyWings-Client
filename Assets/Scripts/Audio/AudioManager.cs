@@ -20,7 +20,7 @@ namespace HillyWings
         private int nextSfxSource;
         private AudioSource bgmSource;
 
-        private AudioClip coinClip, speedClip, greatSlideClip, feverClip, cloudClip, islandClip, launchClip, clickClip, dayOverClip, bgmClip;
+        private AudioClip coinClip, speedClip, greatSlideClip, feverClip, cloudClip, islandClip, launchClip, clickClip, dayOverClip, bgmClip, yahoClip;
         // "녹색공을 먹었을때는 병아리 삐약거리는 사운드와 함께 정말 병아리가
         // 날아가는 듯한 사운드" 요청 -- 두 클립을 같이 재생(Play()를 두 번
         // 호출하면 각각 다른 sfxSources 슬롯을 잡아서 자연스럽게 겹쳐 들림).
@@ -100,6 +100,7 @@ namespace HillyWings
             feverClip = ProceduralAudio.Chime("SFX_Fever", new[] { 523.3f, 659.3f, 784f, 1046.5f }, 0.09f, 0.4f);
             cloudClip = ProceduralAudio.Tone("SFX_Cloud", 1318.5f, 0.3f, 0.25f, 0.02f, 0.6f);
             islandClip = ProceduralAudio.Chime("SFX_Island", new[] { 659.3f, 830.6f, 1046.5f }, 0.1f, 0.4f);
+            yahoClip = ProceduralAudio.Yaho("SFX_Yaho");
             launchClip = ProceduralAudio.Sweep("SFX_Launch", 300f, 900f, 0.18f, 0.3f);
             clickClip = ProceduralAudio.NoiseBurst("SFX_Click", 0.05f, 0.25f);
             dayOverClip = ProceduralAudio.Chime("SFX_DayOver", new[] { 587.3f, 493.9f, 392f }, 0.35f, 0.3f);
@@ -179,7 +180,11 @@ namespace HillyWings
             Play(skyFlightChirpClip);
             Play(skyFlightWhooshClip);
         }
-        private void HandleIslandAdvanced(int island) => Play(islandClip);
+        private void HandleIslandAdvanced(int island)
+        {
+            Play(islandClip);
+            Play(yahoClip); // 섬 전환 "야호!" 환호성
+        }
         private void HandleDayOver() => Play(dayOverClip);
 
         private void HandleRunStart()

@@ -211,6 +211,52 @@ namespace HillyWings
             return Build(name, data);
         }
 
+        // 섬 전환 시 "야호!" 환호성 — 빠른 상승(야)에 이어 지속 하강(호~) 글라이드 + 비브라토
+        public static AudioClip Yaho(string name)
+        {
+            const float dur = 0.7f;
+            int samples = Mathf.CeilToInt(SampleRate * dur);
+            var data = new float[samples];
+            float phase = 0f;
+
+            for (int i = 0; i < samples; i++)
+            {
+                float t = (float)i / SampleRate;
+                float t01 = (float)i / samples;
+
+                float freq;
+                if (t < 0.12f)
+                {
+                    // "야!": 빠르게 상승 (380→820Hz)
+                    freq = Mathf.Lerp(380f, 820f, t / 0.12f);
+                }
+                else if (t < 0.28f)
+                {
+                    // "호": 정점에서 약간 내려와 안정 (820→700Hz)
+                    freq = Mathf.Lerp(820f, 700f, (t - 0.12f) / 0.16f);
+                }
+                else
+                {
+                    // "~": 서서히 하강 + 비브라토 (700→430Hz, 5.5Hz ±14Hz 흔들림)
+                    float hoFrac = (t - 0.28f) / 0.42f;
+                    freq = Mathf.Lerp(700f, 430f, hoFrac);
+                    freq += Mathf.Sin(t * Mathf.PI * 2f * 5.5f) * 14f;
+                }
+
+                phase += 2f * Mathf.PI * freq / SampleRate;
+                float env = Envelope(t01, 0.04f, 0.38f);
+
+                // 기음 + 2배음 + 3배음 — 목소리에 가까운 배음 구조
+                float wave = Mathf.Sin(phase) * 0.60f
+                           + Mathf.Sin(2f * phase) * 0.28f
+                           + Mathf.Sin(3f * phase) * 0.12f;
+
+                data[i] = wave * 0.42f * env;
+            }
+
+            return Build(name, data);
+        }
+
         // Two-layer sine pad -- 이전 placeholder BGM. GameBGM으로 교체됨.
         // API는 AudioManager 외부 참조가 없어서 그대로 유지하지만 실제로는 안 쓰임.
         public static AudioClip Pad(string name, float freq1, float freq2, float duration, float volume)
