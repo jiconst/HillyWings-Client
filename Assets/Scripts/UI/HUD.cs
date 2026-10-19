@@ -65,6 +65,16 @@ namespace HillyWings
         private readonly List<Toast> toasts = new List<Toast>();
         private readonly List<PositionedToast> pickupToasts = new List<PositionedToast>();
 
+        // 디버그 HUD: false = 출시 빌드에서 숨김 (Tiny Wings처럼 미니멀한 HUD 유지)
+        [SerializeField] private bool showDebugHud = false;
+
+        // Island 도착 배너 (Tiny Wings 스타일 슬라이드 인 애니메이션)
+        private RectTransform islandBannerRect;
+        private TextMeshProUGUI islandBannerText;
+        private Image islandBannerBg;
+        private float islandBannerTimeLeft;
+        private const float IslandBannerDuration = 2.8f;
+
         private GameObject root;
 
         private RectTransform scorePanelRect;
@@ -209,7 +219,15 @@ namespace HillyWings
         // IslandRemainingDistance가 0이 되는 것)에 도달한 순간을 토스트로 눈에
         // 보이게 남김. 그 다음 섬의 남은 거리 카운트다운은 별도 처리 없이 그대로
         // 이어짐(GameManager.AdvanceScroll이 islandDistance를 알아서 리셋).
-        private void HandleIslandAdvanced(int island) => AddToast($"ISLAND {island} REACHED! LEVEL UP", new Color(0.4f, 0.85f, 0.5f), toastDuration);
+        private void HandleIslandAdvanced(int island)
+        {
+            // 스타일 배너 표시 (Tiny Wings 스크린샷 참고)
+            islandBannerText.text   = $"ISLAND  {island}";
+            islandBannerTimeLeft    = IslandBannerDuration;
+            islandBannerBg.gameObject.SetActive(true);
+            // 토스트로도 배수 변경 안내
+            AddToast($"×{GameManager.Instance.Multiplier}  MULTIPLIER!", new Color(0.4f, 0.85f, 0.5f), toastDuration);
+        }
 
         private void OnDestroy()
         {
@@ -321,6 +339,7 @@ namespace HillyWings
             BuildStreakPanel(t);
             BuildNestPanel(t);
             BuildFeverBadge(t);
+            BuildIslandBanner(t);
             BuildToastPool(t);
             BuildPickupToastPool(t);
             BuildDebugText(t);
@@ -416,6 +435,20 @@ namespace HillyWings
             panel.gameObject.SetActive(false);
         }
 
+        // Tiny Wings 스타일 Island 도착 배너 — 화면 하단 중앙에서 슬라이드 인
+        private void BuildIslandBanner(Transform parent)
+        {
+            var panel = UIFactory.CreatePanel(parent, "IslandBanner", new Color(0.18f, 0.40f, 0.72f));
+            islandBannerRect = (RectTransform)panel.transform;
+            islandBannerBg   = panel;
+
+            islandBannerText = UIFactory.CreateText(panel.transform, "IslandBannerText", 32,
+                Color.white, TextAlignmentOptions.Center, FontStyles.Bold);
+            UIFactory.StretchFull((RectTransform)islandBannerText.transform);
+
+            panel.gameObject.SetActive(false);
+        }
+
         private void BuildToastPool(Transform parent)
         {
             for (int i = 0; i < ToastPoolSize; i++)
@@ -473,11 +506,7 @@ namespace HillyWings
             scoreText.text = score.Score.ToString("N0");
             nicknameText.text = DisplayNickname();
 
-            // 요청: 화면 하단 중앙에 "DIST: ...  AIRTIME: ..." 한 줄로. 폰트가
-            // 26->34로 커진 만큼 상자도 같이 키움.
-            distanceText.text = $"DIST: {gameManager.ScrollX:0.00}M   AIRTIME: {bird.TotalAirborneTime:0.00}S";
-            const float distanceW = 620f, distanceH = 50f;
-            UIFactory.SetTopLeft(distanceRect, (Screen.width - distanceW) * 0.5f, Screen.height - distanceH - 16f, distanceW, distanceH);
+            // DIST/AIRTIME은 showDebugHud 블록 안에서만 표시 (아래 참고)
 
             // "레벨 값" 요청 -- Score 박스와 짝을 이루는 LEVEL 박스. 그 아래
             // (섬 진행 바/남은 거리/픽업 개수 박스)는 전부 이 박스의 x/폭 기준으로
@@ -522,24 +551,62 @@ namespace HillyWings
 
             UpdateToasts();
             UpdatePickupToasts();
+            UpdateIslandBanner();
 
-            bool showHeight = cam != null;
-            UIFactory.SetTopLeft(debugPanelRect, Screen.width - 260, Screen.height - (showHeight ? 66 : 44), 248, showHeight ? 60 : 38);
+            // 디버그 요소: showDebugHud=false(기본)이면 숨김 -- Tiny Wings처럼
+            // 게임플레이 중 화면을 깔끔하게 유지
+            distanceRect.gameObject.SetActive(showDebugHud);
+            debugPanelRect.gameObject.SetActive(showDebugHud);
 
-            string state = bird.OnGround ? "Grounded" : bird.Airborne ? "Airborne" : "Falling";
-            dbgStateText.text = $"{state}  spd {bird.Speed:0}{(bird.IsDiving ? "  DIVE" : "")}";
-            UIFactory.SetTopLeft((RectTransform)dbgStateText.transform, Screen.width - 250, Screen.height - 58, 230, 24);
-
-            if (showHeight)
+            if (showDebugHud)
             {
-                dbgHeightText.gameObject.SetActive(true);
-                dbgHeightText.text = $"height {bird.HeightAboveGround:0}  zoom {cam.orthographicSize:0}";
-                UIFactory.SetTopLeft((RectTransform)dbgHeightText.transform, Screen.width - 250, Screen.height - 34, 230, 24);
+                bool showHeight = cam != null;
+                UIFactory.SetTopLeft(debugPanelRect, Screen.width - 260, Screen.height - (showHeight ? 66 : 44), 248, showHeight ? 60 : 38);
+
+                string state = bird.OnGround ? "Grounded" : bird.Airborne ? "Airborne" : "Falling";
+                dbgStateText.text = $"{state}  spd {bird.Speed:0}{(bird.IsDiving ? "  DIVE" : "")}";
+                UIFactory.SetTopLeft((RectTransform)dbgStateText.transform, Screen.width - 250, Screen.height - 58, 230, 24);
+
+                if (showHeight)
+                {
+                    dbgHeightText.gameObject.SetActive(true);
+                    dbgHeightText.text = $"height {bird.HeightAboveGround:0}  zoom {cam.orthographicSize:0}";
+                    UIFactory.SetTopLeft((RectTransform)dbgHeightText.transform, Screen.width - 250, Screen.height - 34, 230, 24);
+                }
+                else dbgHeightText.gameObject.SetActive(false);
+
+                distanceText.text = $"DIST: {gameManager.ScrollX:0.00}M   AIRTIME: {bird.TotalAirborneTime:0.00}S";
+                const float distanceW2 = 620f, distanceH2 = 50f;
+                UIFactory.SetTopLeft(distanceRect, (Screen.width - distanceW2) * 0.5f, Screen.height - distanceH2 - 16f, distanceW2, distanceH2);
             }
-            else
+        }
+
+        // Tiny Wings 스타일 Island 도착 배너: 페이드 인 → 유지 → 페이드 아웃
+        private void UpdateIslandBanner()
+        {
+            if (islandBannerTimeLeft <= 0f) return;
+
+            islandBannerTimeLeft -= Time.deltaTime;
+            if (islandBannerTimeLeft <= 0f)
             {
-                dbgHeightText.gameObject.SetActive(false);
+                islandBannerBg.gameObject.SetActive(false);
+                return;
             }
+
+            float elapsed  = IslandBannerDuration - islandBannerTimeLeft;
+            float fadeIn   = Mathf.Clamp01(elapsed / 0.3f);
+            float fadeOut  = Mathf.Clamp01(islandBannerTimeLeft / 0.5f);
+            float alpha    = Mathf.Min(fadeIn, fadeOut);
+
+            islandBannerBg.color   = new Color(0.18f, 0.40f, 0.72f, alpha * 0.92f);
+            islandBannerText.color = new Color(1f, 1f, 1f, alpha);
+
+            // 하단 중앙에서 슬라이드 인 (스크린샷 참고: 하단 1/4 지점)
+            float slideOffset = (1f - fadeIn) * 30f;
+            const float bannerW = 340f, bannerH = 68f;
+            float bannerY = Screen.height * 0.78f + slideOffset;
+            UIFactory.SetTopLeftCentered(islandBannerRect,
+                Screen.width * 0.5f - bannerW * 0.5f, bannerY, bannerW, bannerH);
         }
 
         private void UpdateDayClock()

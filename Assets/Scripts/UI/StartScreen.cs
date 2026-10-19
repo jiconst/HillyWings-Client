@@ -26,6 +26,8 @@ namespace HillyWings
         // 닉네임 표시 줄(신규) 1개 추가 여유분 -- 원래 12(점수 최대 10줄 + 총
         // 슬라이드 + 총 비행일 수)로 꽉 차 있었음.
         private const int MaxLeaderboardLines = 13;
+        // Tiny Wings 방식 슬라이드 튜토리얼 페이지 수
+        private const int HowToPlayPageCount = 4;
 
         private enum Panel { MainMenu, Settings, HowToPlay, Stats }
         private enum StatsTab { Leaderboard, Birds, Missions }
@@ -70,8 +72,9 @@ namespace HillyWings
         private RectTransform titleRect;
         private TextMeshProUGUI bestText;
         private RectTransform cardRect;
-        private Button playButton, settingsButton, statsButton, howToPlayButton;
-        private TextMeshProUGUI playButtonText, settingsButtonText, statsButtonText, howToPlayButtonText;
+        // TODAY/STANDARD 두 플레이 버튼 (Tiny Wings 방식)
+        private Button playTodayButton, playButton, settingsButton, statsButton, howToPlayButton;
+        private TextMeshProUGUI playTodayButtonText, playButtonText, settingsButtonText, statsButtonText, howToPlayButtonText;
 
         // 설정 - 환경설정
         private GameObject settingsPreferencesGroup;
@@ -111,12 +114,18 @@ namespace HillyWings
         private Button signupNicknameDoneButton;
         private TextMeshProUGUI signupNicknameDoneButtonText;
 
-        // 게임 방법
+        // 게임 방법 (슬라이드 방식, Tiny Wings 스타일)
+        private int howToPlayPage;
         private TextMeshProUGUI howToPlayTitleText;
-        private RectTransform howToPlayCardRT;   // 본문 카드 배경
+        private RectTransform howToPlayCardRT;
         private TextMeshProUGUI howToPlayBodyText;
+        private TextMeshProUGUI howToPlayPageText;
+        private Button howToPlayPrevButton;
+        private TextMeshProUGUI howToPlayPrevButtonText;
         private Button howToPlayBackButton;
         private TextMeshProUGUI howToPlayBackButtonText;
+        private Button howToPlayNextButton;
+        private TextMeshProUGUI howToPlayNextButtonText;
 
         // 기록 - 탭바
         private Button statsTabLeaderboardButton, statsTabBirdsButton, statsTabMissionsButton;
@@ -279,6 +288,8 @@ namespace HillyWings
             // 헷갈림.
             if (panel != Panel.Settings) SwitchSettingsView(SettingsView.Preferences);
             if (panel != Panel.Stats) SwitchStatsTab(StatsTab.Leaderboard);
+            // 게임 방법을 열 때마다 첫 슬라이드부터 시작
+            if (panel == Panel.HowToPlay) SetHowToPlayPage(0);
         }
 
         private void SwitchSettingsView(SettingsView view)
@@ -335,8 +346,18 @@ namespace HillyWings
             var card = UIFactory.CreatePanel(parent, "Card", new Color(0.98f, 0.9f, 0.75f, 0.95f));
             cardRect = (RectTransform)card.transform;
 
-            playButton = UIFactory.CreateButton(card.transform, "PlayButton", "", 22, Color.white, out playButtonText);
-            playButton.image.color = new Color(0.86f, 0.27f, 0.27f); // 참고 스크린샷처럼 PLAY만 강조색
+            // 오늘의 비행 버튼 (Tiny Wings TODAY 방식 — 날짜 기반 고정 지형)
+            playTodayButton = UIFactory.CreateButton(card.transform, "PlayTodayButton", "", 22, Color.white, out playTodayButtonText);
+            playTodayButton.image.color = new Color(0.86f, 0.27f, 0.27f);
+            playTodayButton.onClick.AddListener(() =>
+            {
+                audio?.PlayClick();
+                GameManager.Instance.BeginRun(GameManager.TodaySeed());
+            });
+
+            // 일반 비행 버튼 (매 런 랜덤 씨앗)
+            playButton = UIFactory.CreateButton(card.transform, "PlayButton", "", 20, Color.white, out playButtonText);
+            playButton.image.color = new Color(0.93f, 0.50f, 0.18f);
             playButton.onClick.AddListener(() =>
             {
                 audio?.PlayClick();
@@ -487,18 +508,33 @@ namespace HillyWings
         {
             var brown = new Color(0.42f, 0.29f, 0.12f);
 
-            howToPlayTitleText = UIFactory.CreateText(parent, "Title", 46,
+            // 슬라이드 제목 (페이지마다 바뀜)
+            howToPlayTitleText = UIFactory.CreateText(parent, "Title", 42,
                 new Color(0.98f, 0.92f, 0.75f), TextAlignmentOptions.Center, FontStyles.Bold);
 
-            // 카드 배경 — 본문 텍스트보다 먼저 생성해야 뒤에 렌더링됨
+            // 카드 배경 — 본문보다 먼저 생성해야 뒤에 렌더링됨
             var card = UIFactory.CreatePanel(parent, "HowToPlayCard", new Color(0.06f, 0.03f, 0.12f, 0.82f));
             howToPlayCardRT = (RectTransform)card.transform;
 
+            // 슬라이드 본문 (페이지마다 바뀜)
             howToPlayBodyText = UIFactory.CreateText(parent, "Body", 24,
                 new Color(0.93f, 0.88f, 0.8f), TextAlignmentOptions.TopLeft, FontStyles.Bold);
 
-            howToPlayBackButton = UIFactory.CreateButton(parent, "HowToPlayBackButton", "", 24, brown, out howToPlayBackButtonText);
+            // 페이지 표시 "1 / 4"
+            howToPlayPageText = UIFactory.CreateText(parent, "PageText", 20,
+                new Color(0.85f, 0.78f, 0.65f), TextAlignmentOptions.Center);
+
+            // 이전 버튼 (첫 페이지에선 숨김)
+            howToPlayPrevButton = UIFactory.CreateButton(parent, "PrevButton", "", 22, brown, out howToPlayPrevButtonText);
+            howToPlayPrevButton.onClick.AddListener(() => { audio?.PlayClick(); SetHowToPlayPage(howToPlayPage - 1); });
+
+            // 닫기(뒤로가기) 버튼
+            howToPlayBackButton = UIFactory.CreateButton(parent, "HowToPlayBackButton", "", 22, brown, out howToPlayBackButtonText);
             howToPlayBackButton.onClick.AddListener(() => { audio?.PlayClick(); SwitchTo(Panel.MainMenu); });
+
+            // 다음 버튼 (마지막 페이지에선 숨김)
+            howToPlayNextButton = UIFactory.CreateButton(parent, "NextButton", "", 22, brown, out howToPlayNextButtonText);
+            howToPlayNextButton.onClick.AddListener(() => { audio?.PlayClick(); SetHowToPlayPage(howToPlayPage + 1); });
         }
 
         private void BuildStats(Transform parent)
@@ -703,19 +739,22 @@ namespace HillyWings
         // 쏠려 있었음 — 이 버그 때문에 다시 조정.
         private void ReflowMainMenu(float cx, float cy)
         {
-            const float cardW = 300f, cardH = 280f;
+            // TODAY/STANDARD 버튼 추가로 카드 높이 확장
+            const float cardW = 300f, cardH = 318f;
             float cardX = cx - cardW * 0.5f;
             float cardY = cy - cardH * 0.5f;
+            float btnW = cardW - 40f;
 
             UIFactory.SetTopLeftCentered(titleRect, cx - 300f, cardY - 158f, 600f, 60f);
             UIFactory.SetTopLeftCentered((RectTransform)bestText.transform, cx - 300f, cardY - 88f, 600f, 26f);
             UIFactory.SetTopLeft(cardRect, cardX, cardY, cardW, cardH);
 
-            // 아래 좌표는 카드 자신의 rect 기준(카드가 부모) — 화면 절대좌표 아님.
-            UIFactory.SetTopLeft((RectTransform)playButton.transform, 20f, 20f, cardW - 40f, 60f);
-            UIFactory.SetTopLeft((RectTransform)settingsButton.transform, 20f, 96f, cardW - 40f, 46f);
-            UIFactory.SetTopLeft((RectTransform)statsButton.transform, 20f, 154f, cardW - 40f, 46f);
-            UIFactory.SetTopLeft((RectTransform)howToPlayButton.transform, 20f, 212f, cardW - 40f, 46f);
+            // 카드 내부 좌표 기준
+            UIFactory.SetTopLeft((RectTransform)playTodayButton.transform, 20f, 14f,  btnW, 54f);
+            UIFactory.SetTopLeft((RectTransform)playButton.transform,      20f, 76f,  btnW, 48f);
+            UIFactory.SetTopLeft((RectTransform)settingsButton.transform,  20f, 134f, btnW, 44f);
+            UIFactory.SetTopLeft((RectTransform)statsButton.transform,     20f, 186f, btnW, 44f);
+            UIFactory.SetTopLeft((RectTransform)howToPlayButton.transform, 20f, 238f, btnW, 44f);
         }
 
         private void ReflowSettings(float cx, float cy)
@@ -778,31 +817,63 @@ namespace HillyWings
 
         private void ReflowHowToPlay(float cx, float cy)
         {
-            const float cardW   = 680f;
-            const float cardPad = 16f;
-            const float titleH  = 64f;
-            const float bodyH   = 310f;   // 본문 텍스트 영역 높이
-            const float btnW    = 220f;
-            const float btnH    = 58f;
+            const float cardW    = 680f;
+            const float cardPad  = 16f;
+            const float titleH   = 60f;
+            const float bodyH    = 320f;
+            const float sideBtnW = 110f;
+            const float closeBtnW = 180f;
+            const float btnH     = 58f;
+            const float btnGap   = 14f;
 
             float titleTop = cy - 240f;
             UIFactory.SetTopLeftCentered((RectTransform)howToPlayTitleText.transform,
                 cx - cardW * 0.5f, titleTop, cardW, titleH);
 
-            // 본문 텍스트
             float bodyTop = titleTop + titleH + 10f;
             UIFactory.SetTopLeft((RectTransform)howToPlayBodyText.transform,
                 cx - cardW * 0.5f + cardPad, bodyTop + cardPad,
                 cardW - cardPad * 2f, bodyH);
 
-            // 카드 박스 (본문 텍스트 감쌈)
+            // 카드 박스
             UIFactory.SetTopLeft(howToPlayCardRT,
                 cx - cardW * 0.5f, bodyTop,
                 cardW, bodyH + cardPad * 2f);
 
+            // 버튼 3개: [이전] [닫기] [다음] 가로 정렬
+            float totalBtnW = sideBtnW + btnGap + closeBtnW + btnGap + sideBtnW;
+            float bx = cx - totalBtnW * 0.5f;
             float btnY = bodyTop + bodyH + cardPad * 2f + 14f;
+
+            UIFactory.SetTopLeftCentered((RectTransform)howToPlayPrevButton.transform,
+                bx, btnY, sideBtnW, btnH);
             UIFactory.SetTopLeftCentered((RectTransform)howToPlayBackButton.transform,
-                cx - btnW * 0.5f, btnY, btnW, btnH);
+                bx + sideBtnW + btnGap, btnY, closeBtnW, btnH);
+            UIFactory.SetTopLeftCentered((RectTransform)howToPlayNextButton.transform,
+                bx + sideBtnW + btnGap + closeBtnW + btnGap, btnY, sideBtnW, btnH);
+
+            // 페이지 표시 (버튼 아래 중앙)
+            UIFactory.SetTopLeftCentered((RectTransform)howToPlayPageText.transform,
+                cx - 80f, btnY + btnH + 8f, 160f, 28f);
+        }
+
+        private void SetHowToPlayPage(int page)
+        {
+            howToPlayPage = Mathf.Clamp(page, 0, HowToPlayPageCount - 1);
+            RefreshHowToPlayPage();
+        }
+
+        private void RefreshHowToPlayPage()
+        {
+            int p = howToPlayPage;
+            howToPlayTitleText.text  = Localization.Get($"howtoplay.slide{p + 1}.title");
+            howToPlayBodyText.text   = Localization.Get($"howtoplay.slide{p + 1}.body");
+            howToPlayPageText.text   = $"{p + 1} / {HowToPlayPageCount}";
+            howToPlayPrevButton.gameObject.SetActive(p > 0);
+            howToPlayNextButton.gameObject.SetActive(p < HowToPlayPageCount - 1);
+            howToPlayPrevButtonText.text = Localization.Get("howtoplay.prev");
+            howToPlayNextButtonText.text = Localization.Get("howtoplay.next");
+            howToPlayBackButtonText.text = Localization.Get("menu.back");
         }
 
         private void ReflowStats(float cx, float cy)
@@ -879,9 +950,10 @@ namespace HillyWings
         // "로그인"/"회원가입" 라벨)은 RefreshContent() 쪽에서 처리.
         private void RefreshStaticLabels()
         {
-            playButtonText.text = Localization.Get("menu.play");
-            settingsButtonText.text = Localization.Get("menu.settings");
-            statsButtonText.text = Localization.Get("menu.stats");
+            playTodayButtonText.text = Localization.Get("menu.playToday");
+            playButtonText.text      = Localization.Get("menu.playStandard");
+            settingsButtonText.text  = Localization.Get("menu.settings");
+            statsButtonText.text     = Localization.Get("menu.stats");
             howToPlayButtonText.text = Localization.Get("menu.howToPlay");
 
             musicLabelText.text = Localization.Get("settings.music");
@@ -903,9 +975,8 @@ namespace HillyWings
             signupNicknameRerollButtonText.text = Localization.Get("start.nicknameReroll");
             signupNicknameDoneButtonText.text = Localization.Get("settings.nicknameStepDone");
 
-            howToPlayTitleText.text = Localization.Get("menu.howToPlay");
-            howToPlayBodyText.text = Localization.Get("howtoplay.body");
-            howToPlayBackButtonText.text = Localization.Get("menu.back");
+            // 현재 슬라이드 텍스트 갱신 (언어 변경 시 현재 페이지 내용 유지)
+            RefreshHowToPlayPage();
 
             statsTabLeaderboardText.text = Localization.Get("stats.tabLeaderboard");
             statsTabBirdsText.text = Localization.Get("stats.tabBirds");

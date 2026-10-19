@@ -65,13 +65,21 @@ namespace HillyWings
             Ground = new GroundSampler(terrainSeed, viewHeight);
         }
 
-        // Called by StartScreen (first press) and DayOverScreen ("다시하기").
-        public void BeginRun()
+        // TODAY 모드: UTC 날짜 기반 고정 씨앗 -- 같은 날은 세계 어디서나 같은 지형
+        public static int TodaySeed()
+        {
+            var now = DateTime.UtcNow;
+            return now.Year * 10000 + now.DayOfYear;
+        }
+
+        // seed 지정 시 해당 씨앗(TODAY 모드 등), null이면 매 런 랜덤
+        public void BeginRun(int? seed = null)
         {
             ScrollX = 0f;
             Island = 1;
             islandDistance = 0f;
-            Ground = new GroundSampler(UnityEngine.Random.Range(1, int.MaxValue), viewHeight);
+            int actualSeed = seed ?? UnityEngine.Random.Range(1, int.MaxValue);
+            Ground = new GroundSampler(actualSeed, viewHeight);
             State = GameState.Playing;
             OnRunStart?.Invoke();
         }

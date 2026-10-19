@@ -89,6 +89,8 @@ namespace HillyWings
             // 메인 메뉴 (PLAY/설정/기록/게임 방법 4개 버튼, 스크린샷 참고 레이아웃)와 하위 화면들.
             // PLAY는 이제 화면 전환 없이 바로 게임을 시작함 — "게임플레이"라는
             // 화면 이름이 아니라 버튼 동사라 "플레이"로 바꿈.
+            ["menu.playToday"]    = ("오늘의 비행", "TODAY"),
+            ["menu.playStandard"] = ("일반 비행",  "STANDARD"),
             ["menu.play"] = ("플레이", "Play"),
             ["menu.settings"] = ("설정", "Settings"),
             ["menu.stats"] = ("기록", "Stats"),
@@ -116,6 +118,46 @@ namespace HillyWings
                 "Land right after diving to score a Great Slide! Three in a row triggers Fever Mode, doubling your score.\n\n" +
                 "Collect yellow coins and blue speed coins, and touch clouds while airborne for bonus points.\n" +
                 "Each island you pass increases your score multiplier."),
+
+            // 게임 방법 슬라이드 (4페이지, Tiny Wings 방식)
+            ["howtoplay.prev"]  = ("이전", "Prev"),
+            ["howtoplay.next"]  = ("다음", "Next"),
+
+            ["howtoplay.slide1.title"] = ("조작 방법", "Controls"),
+            ["howtoplay.slide1.body"]  = (
+                "화면을 누르고 있으면 병아리가\n내리막에서 빠르게 하강합니다.\n\n" +
+                "오르막 정상 부근에서 손을 떼면\n하늘로 발사됩니다!",
+                "Hold the screen on a downhill\nto dive down fast.\n\n" +
+                "Release near the hilltop\nto launch into the air!"),
+
+            ["howtoplay.slide2.title"] = ("Great Slide & Fever", "Great Slide & Fever"),
+            ["howtoplay.slide2.body"]  = (
+                "다이빙 직후 착지에 성공하면\n'Great Slide'!\n\n" +
+                "3번 연속 성공하면 Fever Mode 발동 —\n모든 점수가 2배가 됩니다.\n\n" +
+                "Fever 중에도 Great Slide를 계속\n성공시켜 Fever를 연장하세요!",
+                "Land right after diving for a\n'Great Slide'!\n\n" +
+                "Three in a row triggers Fever Mode —\ndouble all your points!\n\n" +
+                "Keep landing Great Slides\nto extend your Fever!"),
+
+            ["howtoplay.slide3.title"] = ("아이템", "Collectibles"),
+            ["howtoplay.slide3.body"]  = (
+                "노란 코인 = +3점\n" +
+                "파란 스피드 코인 = 속도 부스트\n" +
+                "구름 터치 (공중에서만) = +20점\n\n" +
+                "초록 Sky Flight 오브를 먹으면\n병아리가 하늘 높이 날아오릅니다!",
+                "Yellow coin = +3 pts\n" +
+                "Blue speed coin = speed boost\n" +
+                "Touch clouds (airborne only) = +20 pts\n\n" +
+                "Grab the green Sky Orb to\nsoar high into the sky!"),
+
+            ["howtoplay.slide4.title"] = ("섬 & Nest", "Islands & Nest"),
+            ["howtoplay.slide4.body"]  = (
+                "섬을 통과할 때마다 점수 배수가 올라갑니다.\n\n" +
+                "Nest 목표 3개를 모두 달성하면\n영구 배수 보너스 +1!\n\n" +
+                "해가 지기 전에 최대한 멀리 날아가세요!",
+                "Each island increases your score multiplier.\n\n" +
+                "Complete all 3 Nest Goals for\na permanent +1 multiplier bonus!\n\n" +
+                "Fly as far as you can before nightfall!"),
 
             ["dayover.title"] = ("해가 졌어요", "The sun has set"),
             ["dayover.restart"] = ("다시하기", "Play Again"),

@@ -36,11 +36,15 @@ namespace HillyWings
         public const float DownhillSlopeThreshold = 0.04f;
         public const float LaunchSlopeThreshold = -0.07f;
         public const float LaunchSpeedFactor = 0.75f;
-        // "많이 튕기지 않았으면"(1.25->0.8) + "오르막 힘겹게"(UphillDecelRate)
-        // 튜닝을 둘 다 시도했다가 "게임이 너무 쉬워졌다" 피드백으로 되돌림
-        // (2026-08-20) -- 원래 값(1.25)으로 복원. 튜닝 자체는 CLAUDE.md에
-        // 기록만 남기고 코드에서는 제거.
+        // "많이 튕기지 않았으면" 피드백으로 1.25→0.8 시도했다가
+        // "게임이 너무 쉬워졌다" 피드백으로 원래 값(1.25)으로 복원.
         public const float LaunchVelocityFactor = 1.25f;
+
+        // 급경사 오르막 페널티 — 경사가 이 값보다 가파른 오르막에서 추가 감속.
+        // 뾰족한 언덕은 충분한 속도 없이 접근하면 바운스를 반복하며 힘겹게 넘게 됨.
+        // 유저가 급경사 언덕을 사전에 인지하고 피하거나 속도를 충분히 확보하도록 유도.
+        public const float UphillSlopeThreshold = 0.18f;
+        public const float UphillDecelRate = 300f;
 
         // A looser launch threshold means near-flat hilltops can trigger a
         // brief, unintended micro-hop (a few frames of Airborne from
@@ -192,6 +196,16 @@ namespace HillyWings
                     holdWasDownhill = true;
                     IsDiving = true;
                     Speed = Mathf.Min(SpeedMax, Speed + DiveAccel * dt);
+                }
+
+                // 급경사 오르막 페널티: 경사가 UphillSlopeThreshold 초과분만큼 추가 감속.
+                // 낮은 속도로 뾰족한 언덕에 접근하면 바운스마다 속도를 잃어 힘겹게 느껴짐 —
+                // 유저가 가파른 언덕을 미리 인지하고 속도를 확보하거나 우회를 선택하도록 유도.
+                if (!skyFlightActive && slope < -UphillSlopeThreshold)
+                {
+                    float uphillPenalty = (-slope - UphillSlopeThreshold) * UphillDecelRate;
+                    Speed -= uphillPenalty * dt;
+                    Speed = Mathf.Clamp(Speed, SpeedMin, SpeedMax);
                 }
 
                 if (slope < LaunchSlopeThreshold && Speed > SpeedBase * LaunchSpeedFactor)

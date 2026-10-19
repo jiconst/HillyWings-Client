@@ -157,6 +157,8 @@ namespace HillyWings
 
             var dayGO = new GameObject("DayCycle");
             var dayCycle = dayGO.AddComponent<DayCycle>();
+            // 속도 연동: 빠를수록 해가 느리게 움직임 (Tiny Wings 방식)
+            dayCycle.Configure(bird);
             terrain.SetDayCycle(dayCycle);
 
             var backHillGO = new GameObject("BackgroundHill");

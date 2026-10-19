@@ -17,7 +17,11 @@ namespace HillyWings
     {
         [SerializeField] private float radius = 15f;
         [SerializeField] private float startXFraction = 0.5f;
-        [SerializeField] private float skyFlightScoreRate = 0.03f; // score per world-unit traveled while a Sky Flight buff is active -- see FixedUpdate
+        // Sky Flight 중 거리 점수 비율 — 공중에 떠 있는 동안 HUD 점수가 멈춰 보이는 현상 방지
+        [SerializeField] private float skyFlightScoreRate = 0.03f;
+        // Tiny Wings 방식: 이동 거리 자체에서 항상 소량의 점수가 쌓임 (Great Slide / 픽업 이벤트와 별개)
+        // baseSpeed(360) 기준 초당 ~1.8pt — HUD 숫자를 살아있게 유지하되 슬라이드 점수를 압도하지 않는 수준
+        [SerializeField] private float distanceScoreRate = 0.005f;
 
         public event Action OnGreatSlideLanding;
         public event Action OnMissedLanding;
@@ -115,14 +119,12 @@ namespace HillyWings
 
             if (physics.Airborne) TotalAirborneTime += dt;
 
-            // Sky Flight (Collectibles/SkyOrbSpawner.cs): normal scoring is
-            // entirely event-driven (landing a slide, touching a coin/cloud)
-            // and none of those happen while soaring high above everything,
-            // so the score readout would otherwise sit frozen for the whole
-            // buff. A small continuous trickle proportional to distance
-            // covered keeps it climbing the entire time instead.
+            // Tiny Wings 방식 거리 점수: 이동 거리에 비례해 항상 소량씩 점수가 쌓임.
+            // Sky Flight 중에는 추가 배율(skyFlightScoreRate)을 더해서 하늘 비행의 시각적 보상감을 강조.
+            float baseDist = physics.Speed * dt;
+            ScoreManager.Instance.AddScore(baseDist * distanceScoreRate);
             if (physics.IsSkyFlightActive)
-                ScoreManager.Instance.AddScore(physics.Speed * dt * skyFlightScoreRate);
+                ScoreManager.Instance.AddScore(baseDist * skyFlightScoreRate);
 
             if (physics.JustLandedGreatSlide) OnGreatSlideLanding?.Invoke();
             if (physics.JustLandedMiss) OnMissedLanding?.Invoke();

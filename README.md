@@ -1,87 +1,182 @@
 # Hilly Wings (병아리 날다)
 
-타이니윙스(Tiny Wings) 스타일 언덕 슬라이드/글라이드 게임의 **핵심 물리 프로토타입**입니다.
-지금 이 단계에서는 "터치로 하강 가속 → 상승 경사에서 발사되어 비행"이라는 재미의 본질이
-실제로 느껴지는지만 검증합니다. 코인/스피드코인/클라우드터치/네스트 미션/다국어/Firebase
-랭킹/사운드는 **의도적으로 아직 구현하지 않았습니다** (아래 "다음 단계" 참고).
+타이니윙스(Tiny Wings) 스타일 언덕 슬라이드/글라이드 모바일 게임입니다.
+내리막을 빠르게 하강 후 정상에서 발사 — 하늘을 날아 다음 섬으로 이동하는 물리 기반 게임입니다.
 
-이 환경에는 Unity 에디터가 없어 직접 실행/컴파일 확인은 못 했습니다. 표준 Unity API로
-작성했지만, 에디터에서 여신 후 한 번 플레이 테스트를 해보시고 이상이 있으면 알려주세요.
+## 게임 방법
 
-## 실행 방법
+- **화면 누르기**: 내리막에서 빠르게 하강 (누르고 있는 동안 가속)
+- **손 떼기**: 오르막 정상 부근에서 손을 떼면 하늘로 발사
+- **Great Slide**: 다이빙 직후 착지 성공 시 획득
+- **Fever Mode**: Great Slide 3연속 → 점수 2배
+- **코인 수집**: 노란 코인(+3점), 파란 스피드코인(속도 부스트)
+- **클라우드 터치**: 공중에서 구름 터치 시 +20점
+- **Sky Flight Orb**: 초록 오브 획득 시 하늘 비행
 
-1. Unity Hub → **New Project** → 2D 템플릿(Built-in RP 권장, URP는 아래 주의사항 참고)으로
-   새 프로젝트 생성.
-2. 새 프로젝트의 `Assets` 폴더 안에 이 저장소의 `Assets/Scripts` 폴더를 통째로 복사해
-   넣습니다 (즉 `YourProject/Assets/Scripts/...`).
-3. Hierarchy에서 빈 GameObject 하나 생성 (`GameObject > Create Empty`) → 이름은 아무거나
-   (예: `Bootstrap`).
-4. 그 GameObject에 `GameBootstrapper` 컴포넌트를 추가 (Inspector에서 `Add Component` →
-   `GameBootstrapper` 검색).
-5. Play 버튼 클릭. 터레인/새/카메라가 전부 코드로 자동 생성됩니다 — 씬에 아무것도 더
-   만들 필요 없습니다.
+## 실행 환경
 
-**조작**: 마우스(에디터) 또는 터치(기기)를 누르고 있으면, 하강 경사를 타는 동안 가속됩니다.
-착지 순간에 맞춰 누르면(2연속 = Great Slide, 3연속 = Fever) 콤보가 붙습니다.
+- Unity 2022.3 LTS 이상 권장
+- 2D Built-in RP (URP 사용 시 셰이더 설정 필요, 아래 참고)
+- iOS / Android 빌드 지원
+- 서버: FlyingChick-Server (Kotlin + PostgreSQL), 로컬 기본 포트 8010
 
-화면 좌측 상단에 속도/상태/점수/낮 시간 남은 시간이 표시되는 임시 디버그 HUD가 있습니다
-(`SimpleHud.cs` — 출시용 UI가 아니라 물리 검증용입니다).
+## 설치 및 실행
 
-### URP를 쓰는 경우
+1. Unity Hub에서 프로젝트 열기 (`HillyWings-Client/` 폴더)
+2. `Assets/Resources/Audio/BGM/` 에 BGM 파일 배치 (예: `bensound-cute.mp3`)
+3. Play 버튼 클릭 — 모든 씬/오브젝트는 코드로 자동 생성됨
 
-`TerrainGenerator`와 `GameBootstrapper`가 사용하는 `Sprites/Default` 셰이더는 URP에서
-핑크색으로 보일 수 있습니다. `TerrainGenerator` 인스펙터의 `Shader Name` 필드를
-`Universal Render Pipeline/2D/Sprite-Lit-Default` 등으로 바꿔주세요.
+### URP 사용 시
+
+`TerrainGenerator` 인스펙터의 `Shader Name` 필드를
+`Universal Render Pipeline/2D/Sprite-Lit-Default`로 변경.
 
 ## 폴더 구조
 
 ```
-Assets/Scripts/
-  Gameplay/
-    TerrainGenerator.cs   각 언덕 형태를 결정하는 사인파 함수 + 시각 메시 생성
-    BirdController.cs     핵심 물리 (아래 알고리즘 설명 참고)
-  Camera/
-    CameraRig.cs           새를 따라가며, 공중에 높이 뜨면 자동 줌아웃/줌인
-  Core/
-    InputService.cs        터치/마우스 입력 추상화
-    GameManager.cs          낮/밤 타이머 + 점수 (프로토타입 범위)
-    GameBootstrapper.cs     위 컴포넌트들을 런타임에 코드로 조립
-    ProceduralSprite.cs     임시 원형 스프라이트 생성 (아트 에셋 불필요)
-  Debug/
-    SimpleHud.cs            OnGUI 디버그 오버레이 (임시)
+Assets/
+  Scripts/
+    Core/
+      GameBootstrapper.cs   런타임 씬/컴포넌트 조립
+      GameManager.cs        낮/밤 타이머, 게임 상태 관리
+      Localization.cs       한국어/영어 다국어 (Language enum)
+      SaveSystem.cs         로컬 저장 (최고점수, 언어, 새 컬렉션 등)
+      CoinWallet.cs         코인 수집/지출 관리
+      DailyMissions.cs      일일 미션 생성 및 추적
+    Gameplay/
+      BirdController.cs     핵심 물리 (아래 알고리즘 참고)
+      TerrainGenerator.cs   사인파 기반 절차적 지형 생성
+      IslandManager.cs      다중 섬 전환 관리
+      Collectibles/
+        CoinSpawner.cs      노란/파란 코인 스폰
+        CloudSpawner.cs     구름 스폰 (클라우드터치)
+        SkyOrbSpawner.cs    Sky Flight Orb
+    UI/
+      StartScreen.cs        메인 메뉴 + 설정 + 게임방법(슬라이드) + 기록
+      DayOverScreen.cs      결과 화면 (점수/통계/코인)
+      UIFactory.cs          UGUI 런타임 생성 헬퍼
+    Audio/
+      AudioManager.cs       BGM + SFX 재생
+    Network/
+      ApiClient.cs          서버 REST API 클라이언트
+      AuthService.cs        로그인/회원가입
+      RankingService.cs     온라인 점수 조회
 ```
 
 ## 핵심 물리 알고리즘
 
-`BirdController.FixedUpdate()`에서 매 스텝마다:
+`BirdController.FixedUpdate()` 매 스텝:
 
-1. 새가 항상 **자유낙하 중이라고 가정**하고 중력을 적분해 다음 위치 후보를 계산합니다.
-2. 그 x좌표에서의 지형 높이(`TerrainGenerator.HeightAt`)와 후보 y좌표를 비교합니다.
-3. 후보 위치가 지형보다 **아래**면 → 착지: 위치를 지형 위로 스냅하고, 속도를 지형의
-   접선(tangent) 방향으로 재배치합니다. 하강 경사이고 입력을 누르고 있으면 추가 가속을
-   더합니다.
-4. 후보 위치가 지형보다 **위**면 → 공중: 그대로 자유낙하를 계속합니다.
+1. 자유낙하 중이라 가정, 중력 적분으로 다음 위치 후보 계산
+2. 해당 x좌표의 지형 높이(`TerrainGenerator.HeightAt`)와 비교
+3. **지형 아래** → 착지: 지형 위로 스냅, 속도를 접선 방향으로 재배치. 하강+입력 중이면 추가 가속
+4. **지형 위** → 공중: 자유낙하 계속
 
-이 한 번의 비교만으로 **착지와 발사(공중으로 튕겨나가는 것)를 동시에 처리**합니다.
-언덕 정상이 급하게 꺾이면서 지형이 자유낙하 궤적보다 더 빠르게 아래로 꺼지는 구간에서는,
-비교 결과가 자연스럽게 "공중"으로 나오면서 새가 붕 뜹니다 — 착지/발사를 위한 별도의
-상태 분기 코드가 필요 없습니다.
+단 한 번의 비교로 착지/발사를 처리. 지형 수식(`h(x)`)을 시각 메시와 충돌 판정이 공유하므로 보이는 것과 실제 판정이 완전히 일치합니다.
 
-지형은 사인파 3개를 합성한 순수 함수(`h(x)`)이고, 시각 메시와 물리 판정(`HeightAt`,
-`TangentAt`)이 **같은 함수를 공유**하므로 눈에 보이는 것과 실제 충돌이 절대 어긋나지
-않습니다.
+## 낮/밤 사이클 (DayCycle)
 
-## 다음 단계 (이번 프로토타입 범위 밖)
+- 기본 하루 길이: **90초**
+- **섬 도달 시 낮 초기화** — 다음 섬에 닿는 순간 해가 아침으로 돌아감 (섬마다 새로운 하루)
+- **속도 연동 (Tiny Wings 방식)** — 빠르게 날수록 해가 느리게 움직이고, 충분히 빠르면 해가 뒤로 밀림
 
-앞서 논의한 대로 우선순위는:
+| 속도 | 낮 진행 배율 | 체감 하루 길이 |
+|------|------------|-------------|
+| 300 (저속) | 1.12× | ~80초 (더 빨리 밤이 옴) |
+| 360 (기준) | 1.00× | 90초 |
+| 500 | 0.72× | ~125초 |
+| 700 | 0.32× | ~280초 |
+| 900+ | **음수** | 해가 뒤로 밀림 |
 
-1. 코인 / 스피드코인 / 클라우드터치 / 아일랜드(맵) 분할
-2. 둥지(네스트) 미션 시스템 + 배율 테이블
-3. 스코어 랭킹 — **Firebase**(Firestore) 연동
-4. 다국어 — 한국어/영어 우선, 이후 일본어/중국어(간체·번체) 추가
-5. 사운드 (점프/버튼 SFX, 잔잔한 BGM)
-6. AI 기반 난이도 재조정 — 확장 기능 검토만 (지금은 설계하지 않음)
+인스펙터 `speedInfluence`(기본 0.002)로 민감도 조절.
 
-이 프로토타입의 이벤트 훅(`BirdController.OnGreatSlide`, `OnFeverStart/End`,
-`OnLanded/OnLaunched`)은 위 콘텐츠들이 붙기 쉽도록 미리 분리해뒀습니다 — 코인/네스트
-시스템은 이 이벤트들을 구독하는 별도 매니저로 추가하면 됩니다.
+## 급경사 언덕 위험 요소 (BirdPhysics)
+
+뾰족하고 가파른 언덕은 의도적인 장애물입니다. 낮은 속도로 접근하면 힘겹게 넘어야 하며, 플레이어는 이를 미리 인지하고 피하거나 충분한 속도를 확보해야 합니다.
+
+**메커니즘**: 경사가 `UphillSlopeThreshold`(0.18)를 초과하는 가파른 오르막에 지면 접촉 시 추가 감속 페널티 적용.
+- 낮은 속도로 접근 → 언덕에서 바운스를 반복하며 매번 속도 손실 → 탈출이 점점 어려워짐
+- 충분한 속도(다운힐 가속 후)로 접근 → 발사 각도가 높아 언덕을 깔끔하게 넘음
+- Island 6+ 급경사(slope ≈ -1.4): 페널티 ~315/s, 저속 조우 시 SpeedMin까지 드레인
+
+| 구분 | 임계 경사 | 초당 감속 예시 | 체감 |
+|------|---------|------------|------|
+| 완만한 오르막 (< 0.18) | 페널티 없음 | 0 | 정상 주행 |
+| 보통 오르막 (0.3) | 0.12 초과분 | 36/s | 살짝 느려짐 |
+| 급경사 (1.0) | 0.82 초과분 | 246/s | 빠르게 감속 |
+| Island 6+ 최대 (1.44) | 1.26 초과분 | 378/s | 저속 시 SpeedMin 도달 |
+
+`UphillDecelRate`(기본 300) 인스펙터 값으로 강도 조절.
+
+## 지형 난이도 커브 (GroundSampler)
+
+섬이 진행될수록 언덕의 너비·높이 변화폭이 커져 점점 어려워집니다.
+
+| 섬 | 반파장 범위 | 진폭 범위 | 체감 |
+|----|-----------|---------|------|
+| Island 1 | 0.40~0.44 × H | 0.11~0.13 × H | 일정한 리듬, 패턴 예측 쉬움 |
+| Island 3 | 0.34~0.54 × H | 0.09~0.17 × H | 불규칙해지기 시작 |
+| Island 6+ | 0.24~0.60 × H | 0.08~0.22 × H | 짧은 급경사 + 긴 완만한 언덕 혼재 |
+
+`MaxDifficultyIslands = 5` — Island 6 이후 최고 난이도 고정. 값을 높이면 난이도 상승이 더 완만해짐.
+
+## 섬 전환 (Island Transition) 밸런스
+
+다음 섬으로 이동하는 전환 구간 설계 원칙:
+
+- **직전 섬 마지막 언덕에서 빠른 하강 후 힘찬 점프**로 공중 비행하며 갭을 가로지름
+- 전환 공중 구간에 **코인/스피드코인이 산개** — 잘 플레이한 유저에게 보너스 기회 제공
+- 갭 너비는 체감상 "힘차게 날면 닿는다" 수준으로 조정 (너무 멀면 답답함)
+- 해(태양) 위치가 좌하단 기준으로 표시되며 시간 경과를 나타냄
+- `ISLAND N` 배너가 화면 중앙 하단에 표시되며 전환 확인
+
+## UI 주요 화면
+
+### 메인 메뉴
+- **오늘의 비행** (빨간 버튼) — UTC 날짜 기반 고정 씨앗, 같은 날은 전 세계 동일한 지형 (Tiny Wings TODAY 모드)
+- **일반 비행** (주황 버튼) — 매 런 랜덤 씨앗
+- 설정, 기록, 게임 방법 버튼
+
+### 게임 방법 (Tiny Wings 스타일 슬라이드)
+4페이지 슬라이드 방식, [이전] [뒤로] [다음] 버튼 네비게이션:
+1. **조작 방법** — 하강/발사 기본 컨트롤
+2. **Great Slide & Fever** — 콤보 시스템
+3. **아이템** — 코인/스피드코인/구름/Sky Orb
+4. **섬 & Nest** — 점수 배수 및 Nest 목표
+
+### 섬 도달 배너
+- 섬 전환 시 화면 하단에 파란 배너 슬라이드인 ("ISLAND N")
+- 페이드인 0.3초 → 유지 → 페이드아웃 0.5초, 총 2.8초 표시
+
+### 결과 화면 (Day Over)
+- 점수, 섬 도달, Great Slide 수, 클라우드터치, Fever 최장, 최고기록
+- 코인 획득량 및 누적 코인 표시
+
+## Tiny Wings 분석 기반 적용 사항
+
+| 항목 | Tiny Wings | HillyWings 적용 |
+|---|---|---|
+| TODAY 모드 | 날짜 고정 씨앗 | `GameManager.TodaySeed()` — UTC 날짜 기반 |
+| 섬 도달 배너 | 화면 중앙 하단 표시 | `HUD.cs` 슬라이드인 파란 배너 |
+| Great Slide 3연속 → Fever | 핵심 콤보 시스템 | `SlideJudge.feverTriggerStreak = 3` |
+| 점수 배수 | 섬마다 +2, 최대 30× | `10 + NestBonus + (Island-1)*2` |
+| 이동 거리 점수 트리클 | 항상 소량 쌓임 | `BirdController.distanceScoreRate = 0.005f` |
+| 속도 연동 낮 연장 | 빠를수록 해가 느려짐 | `DayCycle.speedInfluence = 0.002f` |
+| 섬마다 낮 초기화 | 섬 전환 시 새 하루 | `DayCycle.HandleIslandAdvanced` |
+| 진행형 지형 난이도 | 섬마다 어려워짐 | `GroundSampler` easy→hard 커브 |
+| 급경사 언덕 장애물 | 뾰족한 언덕은 피해야 할 위험 요소 | `BirdPhysics.UphillDecelRate` 페널티 |
+| 슬라이드 설명 슬라이드 | 4페이지 방식 | `HowToPlay` 4페이지 ([이전]/[다음]) |
+| 미니멀 HUD | 디버그 요소 숨김 | `showDebugHud = false` 기본값 |
+
+## 다국어
+
+`Localization.Get("key")` 로 모든 UI 텍스트 조회.
+설정 화면에서 언어 전환 (한국어/영어).
+폰트: `Assets/StreamingAssets/Fonts/NanumGothic-Bold.ttf` (기기 빌드용 한국어 폰트).
+
+## 서버 연동 (FlyingChick-Server)
+
+- 로그인/회원가입: `POST /auth/login`, `POST /auth/signup`
+- 점수 등록: `POST /scores` (Day Over 화면 — Phase C, 미구현)
+- 온라인 랭킹 조회: `GET /scores/top`
+- 기본 URL: `Assets/Scripts/Network/ServerConfig.cs` 의 `BaseUrl` 변경

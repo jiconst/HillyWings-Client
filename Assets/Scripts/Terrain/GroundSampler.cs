@@ -26,46 +26,54 @@ namespace HillyWings
         private readonly System.Random rng;
         private readonly List<ControlPoint> points = new List<ControlPoint>();
         private readonly float baseY;
-        private readonly float minHalfWave;
-        private readonly float maxHalfWave;
-        private readonly float minAmp;
-        private readonly float maxAmp;
         private float lastDirection = -1f;
 
+        // 초반 (Island 1) 파라미터 — 좁은 범위, 일정한 리듬
+        private readonly float easyMinHalfWave;
+        private readonly float easyMaxHalfWave;
+        private readonly float easyMinAmp;
+        private readonly float easyMaxAmp;
+        // 후반 (Island 6+) 파라미터 — 넓은 범위, 예측 불가
+        private readonly float hardMinHalfWave;
+        private readonly float hardMaxHalfWave;
+        private readonly float hardMinAmp;
+        private readonly float hardMaxAmp;
+
+        // 이 섬 수만큼 지나면 최고 난이도 도달 (0-indexed 기준: 5 = Island 6 이후 완전 최고)
+        private const float MaxDifficultyIslands = 5f;
+        private const float IslandLength = 2600f;
+
         public float BaseY => baseY;
-        public float MaxAmplitude => maxAmp;
+        // 색상 그라디언트 기준은 최고 난이도 진폭 — 전체 런에서 일관된 색 밴딩
+        public float MaxAmplitude => hardMaxAmp;
 
         public GroundSampler(int seed, float viewHeight)
         {
             rng = new System.Random(seed);
             baseY = viewHeight * 0.66f;
-            // Narrowed range (was 0.22-0.58 / 0.10-0.30) -- full random
-            // width/height variety was too hard to read/play. Kept as a
-            // gentle interim baseline; proper difficulty-curve design for
-            // this is deferred to a later level-balance pass. Widened again
-            // (0.30-0.42 -> 0.36-0.50) per playtest feedback -- more time
-            // between hills to react. Height range left untouched.
-            //
-            // Briefly gentled further (0.36-0.50 -> 0.45-0.62 / 0.11-0.16 ->
-            // 0.07-0.10) per "언덕이 좀더 완만하고" feedback, then reverted
-            // (2026-08-20) after "게임이 너무 쉬워졌다" -- restored to these
-            // values.
-            minHalfWave = viewHeight * 0.36f;
-            maxHalfWave = viewHeight * 0.50f;
-            minAmp = viewHeight * 0.11f;
-            maxAmp = viewHeight * 0.16f;
 
-            // A short flat run behind and right at the start so the bird
-            // spawns on calm ground, and so groundSlope's +-2 finite
-            // difference near x=0 never reads past the front of the list.
-            points.Add(new ControlPoint { X = -maxHalfWave * 2f, Y = baseY });
+            // Island 1-2: 반파장·진폭 모두 좁은 범위 → 일정한 리듬, 초보자도 패턴 파악 가능
+            easyMinHalfWave = viewHeight * 0.40f;
+            easyMaxHalfWave = viewHeight * 0.44f;
+            easyMinAmp      = viewHeight * 0.11f;
+            easyMaxAmp      = viewHeight * 0.13f;
+
+            // Island 6+: 극단적으로 넓은 범위 → 짧고 가파른 언덕과 길고 완만한 언덕이 혼재
+            hardMinHalfWave = viewHeight * 0.24f;
+            hardMaxHalfWave = viewHeight * 0.60f;
+            hardMinAmp      = viewHeight * 0.08f;
+            hardMaxAmp      = viewHeight * 0.22f;
+
+            float startMaxHalf = easyMaxHalfWave;
+            // 시작 지점: 새가 평지에서 안전하게 스폰되도록 짧은 평지 구간 확보
+            points.Add(new ControlPoint { X = -startMaxHalf * 2f, Y = baseY });
             points.Add(new ControlPoint { X = 0f, Y = baseY });
-            EnsureCoverage(maxHalfWave * 4f);
+            EnsureCoverage(startMaxHalf * 4f);
         }
 
         public float GroundY(float worldX)
         {
-            EnsureCoverage(worldX + maxHalfWave);
+            EnsureCoverage(worldX + hardMaxHalfWave);
             int i = FindSegment(worldX);
             ControlPoint a = points[i];
             ControlPoint b = points[i + 1];
@@ -84,10 +92,21 @@ namespace HillyWings
         {
             while (points[points.Count - 1].X < upToX)
             {
-                float halfWave = Mathf.Lerp(minHalfWave, maxHalfWave, (float)rng.NextDouble());
-                float amp = Mathf.Lerp(minAmp, maxAmp, (float)rng.NextDouble());
+                // 현재 생성 위치를 섬 번호로 환산해 난이도 보간
+                // (GameManager 의존 없이 X 좌표에서 직접 계산)
+                float curX = points[points.Count - 1].X;
+                float islandIdx = Mathf.Max(0f, curX / IslandLength);
+                float t = Mathf.Clamp01(islandIdx / MaxDifficultyIslands);
+
+                float curMinHalfWave = Mathf.Lerp(easyMinHalfWave, hardMinHalfWave, t);
+                float curMaxHalfWave = Mathf.Lerp(easyMaxHalfWave, hardMaxHalfWave, t);
+                float curMinAmp      = Mathf.Lerp(easyMinAmp,      hardMinAmp,      t);
+                float curMaxAmp      = Mathf.Lerp(easyMaxAmp,      hardMaxAmp,      t);
+
+                float halfWave = Mathf.Lerp(curMinHalfWave, curMaxHalfWave, (float)rng.NextDouble());
+                float amp      = Mathf.Lerp(curMinAmp,      curMaxAmp,      (float)rng.NextDouble());
                 lastDirection *= -1f;
-                float nextX = points[points.Count - 1].X + halfWave;
+                float nextX = curX + halfWave;
                 float nextY = baseY + lastDirection * amp;
                 points.Add(new ControlPoint { X = nextX, Y = nextY });
             }
