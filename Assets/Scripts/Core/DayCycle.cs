@@ -16,6 +16,8 @@ namespace HillyWings
         // 속도 1 unit 차이당 낮 진행 배율 조절량.
         // 예: 0.002 → SpeedMax(980)에서 rate = 1 - (980-360)*0.002 = -0.24 (해가 뒤로 밀림)
         [SerializeField] private float speedInfluence = 0.002f;
+        // 섬 경계 통과 시 해를 뒤로 되돌리는 시간(초). 리셋이 아니라 부분 보상.
+        [SerializeField] private float islandTimeReward = 30f;
 
         public float DayTime { get; private set; }
         public float ElapsedTime { get; private set; }
@@ -51,11 +53,11 @@ namespace HillyWings
             DayTime = 0f;
         }
 
-        // 다음 섬 도달 시 낮을 새로 시작 — 섬마다 새로운 하루
+        // 섬 경계 통과 시 해를 islandTimeReward 초만큼 되돌림 (리셋이 아닌 부분 보상)
         private void HandleIslandAdvanced(int island)
         {
-            ElapsedTime = 0f;
-            DayTime = 0f;
+            ElapsedTime = Mathf.Max(0f, ElapsedTime - islandTimeReward);
+            DayTime = Mathf.Min(1f, ElapsedTime / dayDuration);
         }
 
         private void Update()
@@ -63,13 +65,12 @@ namespace HillyWings
             var gm = GameManager.Instance;
             if (gm.State != GameState.Playing) return;
 
-            // 속도가 빠를수록 낮 진행이 느려지고, 충분히 빠르면 해가 뒤로 밀림
+            // 속도가 빠를수록 낮 진행이 느려짐. 단, 속도가 아무리 빨라도 낮은 항상 밤 방향으로만
+            // 진행 (dayRate >= 0 클램프). 해가 뒤로 가는 것은 섬 경계 통과 시에만 발생.
             float currentSpeed = bird != null ? bird.Speed : speedRef;
-            float dayRate = 1f - (currentSpeed - speedRef) * speedInfluence;
+            float dayRate = Mathf.Max(0f, 1f - (currentSpeed - speedRef) * speedInfluence);
 
             ElapsedTime += Time.deltaTime * dayRate;
-            // 해가 새벽 이전으로 되돌아가지 않도록 하한 고정
-            if (ElapsedTime < 0f) ElapsedTime = 0f;
 
             DayTime = Mathf.Min(1f, ElapsedTime / dayDuration);
 
