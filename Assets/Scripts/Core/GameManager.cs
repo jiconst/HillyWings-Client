@@ -18,7 +18,8 @@ namespace HillyWings
     {
         public static GameManager Instance { get; private set; }
 
-        private const float IslandLength = 2600f;
+        // 섬 하나의 길이 — 기본 속도(360) 기준 약 14초, 90초 낮 동안 최대 6~7섬 도달 가능
+        private const float IslandLength = 5000f;
 
         [SerializeField] private float viewHeight = 720f;
 

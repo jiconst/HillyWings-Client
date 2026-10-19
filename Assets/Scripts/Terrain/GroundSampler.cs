@@ -41,7 +41,7 @@ namespace HillyWings
 
         // 이 섬 수만큼 지나면 최고 난이도 도달 (0-indexed 기준: 5 = Island 6 이후 완전 최고)
         private const float MaxDifficultyIslands = 5f;
-        private const float IslandLength = 2600f;
+        private const float IslandLength = 5000f;
 
         public float BaseY => baseY;
         // 색상 그라디언트 기준은 최고 난이도 진폭 — 전체 런에서 일관된 색 밴딩
