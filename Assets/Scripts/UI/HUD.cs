@@ -139,6 +139,31 @@ namespace HillyWings
         private TextMeshProUGUI dbgStateText;
         private TextMeshProUGUI dbgHeightText;
 
+        // 일시정지 버튼 및 오버레이
+        private bool isPaused;
+        private bool pauseShowingStats = true;   // true=STATS 뷰, false=MISSIONS 뷰
+        private int greatSlideCount;             // 현재 런 그레이트 슬라이드 횟수
+        private RectTransform pauseButtonRect;
+        private GameObject pauseOverlay;
+        private RectTransform pauseOverlayRect;
+        private RectTransform pauseCardRect;
+        // STATS 뷰
+        private GameObject pauseStatsPanel;
+        private readonly TextMeshProUGUI[] statValueTexts = new TextMeshProUGUI[7];
+        // MISSIONS 뷰
+        private GameObject pauseMissionsPanel;
+        private TextMeshProUGUI pauseHeaderText;
+        private readonly RectTransform[] missionRowRects = new RectTransform[3];
+        private readonly TextMeshProUGUI[] missionTexts = new TextMeshProUGUI[3];
+        private readonly TextMeshProUGUI[] missionProgressTexts = new TextMeshProUGUI[3];
+        private readonly Image[] missionProgressFills = new Image[3];
+        private readonly Image[] missionCheckmarks = new Image[3];
+        // 토글·액션 버튼
+        private TextMeshProUGUI pauseToggleBtnText;
+        private RectTransform pauseResumeBtn;
+        private RectTransform pauseRestartBtn;
+        private RectTransform pauseHomeBtn;
+
         public void Bind(BirdController birdRef, ScoreManager scoreRef, SlideJudge slideJudgeRef, FeverSystem feverRef, GameManager gameManagerRef)
         {
             bird = birdRef;
@@ -152,6 +177,7 @@ namespace HillyWings
             fever.OnFeverStart += HandleFeverStart;
             gameManager.OnRunStart += HandleRunStart;
             gameManager.OnIslandAdvanced += HandleIslandAdvanced;
+            gameManager.OnRunEnd += HandleRunEnd;
 
             BuildUI();
         }
@@ -213,6 +239,8 @@ namespace HillyWings
             goldPickupCount = 0;
             bluePickupCount = 0;
             greenPickupCount = 0;
+            greatSlideCount = 0;
+            if (isPaused) { isPaused = false; Time.timeScale = 1f; }
         }
 
         // "도착하면 기록" 요청 -- 다음 섬(스테이지) 목표(레벨업 기준 -- 다음 섬까지
@@ -231,6 +259,7 @@ namespace HillyWings
 
         private void OnDestroy()
         {
+            if (isPaused) Time.timeScale = 1f;
             if (slideJudge != null)
             {
                 slideJudge.OnGreatSlide -= HandleGreatSlide;
@@ -241,6 +270,7 @@ namespace HillyWings
             {
                 gameManager.OnRunStart -= HandleRunStart;
                 gameManager.OnIslandAdvanced -= HandleIslandAdvanced;
+                gameManager.OnRunEnd -= HandleRunEnd;
             }
             if (coinSpawner != null)
             {
@@ -258,6 +288,7 @@ namespace HillyWings
 
         private void HandleGreatSlide(int streak, int gained)
         {
+            greatSlideCount++;
             string text = streak >= 3 ? $"GREAT SLIDE x{streak}! +{gained}" : $"SLIDE! +{gained}";
             AddToast(text, new Color(1f, 0.6f, 0.2f), toastDuration);
         }
@@ -343,6 +374,8 @@ namespace HillyWings
             BuildToastPool(t);
             BuildPickupToastPool(t);
             BuildDebugText(t);
+            BuildPauseButton(t);
+            BuildPauseOverlay(t);
         }
 
         // 우측 상단 픽업 개수 박스("골드/파랑/초록 몇 개 먹었는지 박스 안에" 요청) --
@@ -538,6 +571,14 @@ namespace HillyWings
             goldCountText.text = goldPickupCount.ToString("N0");
             blueCountText.text = bluePickupCount.ToString("N0");
             greenCountText.text = greenPickupCount.ToString("N0");
+
+            // 일시정지 버튼: 픽업 카운트 박스 바로 아래, 우측 정렬
+            const float pauseBtnW = 44f, pauseBtnH = 32f;
+            UIFactory.SetTopLeft(pauseButtonRect, levelX + levelPanelW - pauseBtnW, 284f, pauseBtnW, pauseBtnH);
+
+            // 일시정지 오버레이 on/off
+            if (pauseOverlay.activeSelf != isPaused) pauseOverlay.SetActive(isPaused);
+            if (isPaused) UpdatePauseOverlay();
 
             if (dayCycle != null) UpdateDayClock();
             UpdateStreakPanel();
@@ -775,6 +816,296 @@ namespace HillyWings
             tex.SetPixels(pixels);
             tex.Apply();
             return Sprite.Create(tex, new Rect(0, 0, size, size), new Vector2(0.5f, 0.5f));
+        }
+
+        // ──────────────────────────────────────────────────────────────
+        // 일시정지 UI 빌드
+        // ──────────────────────────────────────────────────────────────
+
+        private void BuildPauseButton(Transform parent)
+        {
+            var bg = UIFactory.CreatePanel(parent, "PauseButton", new Color(0f, 0f, 0f, 0.45f));
+            pauseButtonRect = (RectTransform)bg.transform;
+
+            var text = UIFactory.CreateText(bg.transform, "PauseIcon", 18,
+                Color.white, TextAlignmentOptions.Center, FontStyles.Bold);
+            text.text = "II";
+            UIFactory.StretchFull((RectTransform)text.transform);
+
+            AddButtonHandler(bg.gameObject, TogglePause);
+        }
+
+        private void BuildPauseOverlay(Transform parent)
+        {
+            var overlay = UIFactory.CreatePanel(parent, "PauseOverlay", new Color(0f, 0f, 0f, 0.75f));
+            pauseOverlay = overlay.gameObject;
+            pauseOverlayRect = (RectTransform)overlay.transform;
+
+            // 카드 패널 (STATS/MISSIONS 공통 컨테이너)
+            const float cardW = 460f, cardH = 400f;
+            var card = UIFactory.CreatePanel(overlay.transform, "PauseCard", new Color(0.62f, 0.82f, 0.78f, 0.97f));
+            pauseCardRect = (RectTransform)card.transform;
+
+            // STATS 뷰
+            BuildStatsPanel(card.transform, cardW, cardH);
+
+            // MISSIONS 뷰
+            BuildMissionsPanel(card.transform, cardW, cardH);
+
+            // 하단 토글 버튼 (STATS ↔ MISSIONS)
+            var toggleBtn = UIFactory.CreatePanel(card.transform, "ToggleBtn", new Color(0.72f, 0.42f, 0.22f));
+            UIFactory.SetTopLeft((RectTransform)toggleBtn.transform, (cardW - 240f) * 0.5f, cardH - 54f, 240f, 44f);
+            pauseToggleBtnText = UIFactory.CreateText(toggleBtn.transform, "ToggleLbl", 20,
+                Color.white, TextAlignmentOptions.Center, FontStyles.Bold);
+            pauseToggleBtnText.text = "MISSIONS";
+            UIFactory.StretchFull((RectTransform)pauseToggleBtnText.transform);
+            AddButtonHandler(toggleBtn.gameObject, ToggleStatsView);
+
+            // 오른쪽 원형 액션 버튼 (오버레이 직접 자식)
+            pauseResumeBtn  = BuildCircleButton(overlay.transform, "ResumeBtn",  "▶", new Color(0.72f, 0.42f, 0.22f), ResumeGame);
+            pauseRestartBtn = BuildCircleButton(overlay.transform, "RestartBtn", "↺", new Color(0.72f, 0.42f, 0.22f), RestartGame);
+            pauseHomeBtn    = BuildCircleButton(overlay.transform, "HomeBtn",    "⌂", new Color(0.72f, 0.42f, 0.22f), GoHome);
+
+            overlay.gameObject.SetActive(false);
+        }
+
+        private void BuildStatsPanel(Transform parent, float cardW, float cardH)
+        {
+            var panel = UIFactory.CreatePanel(parent, "StatsPanel", Color.clear);
+            pauseStatsPanel = panel.gameObject;
+            var rt = (RectTransform)panel.transform;
+            UIFactory.SetTopLeft(rt, 0f, 0f, cardW, cardH - 60f);
+
+            // 통계 항목: Label + Value
+            string[] labels = { "SCORE", "GREAT SLIDES", "COINS", "DISTANCE", "ISLAND", "BLUE COINS", "GREEN ORBS" };
+            for (int i = 0; i < labels.Length; i++)
+            {
+                float rowY = 16f + i * 48f;
+                bool even = i % 2 == 0;
+                var rowBg = UIFactory.CreatePanel(panel.transform, $"StatRow{i}",
+                    even ? new Color(0f, 0f, 0f, 0.08f) : Color.clear);
+                UIFactory.SetTopLeft((RectTransform)rowBg.transform, 0f, rowY, cardW, 46f);
+
+                var lbl = UIFactory.CreateText(rowBg.transform, "Lbl", 17,
+                    new Color(0.25f, 0.35f, 0.35f), TextAlignmentOptions.MidlineLeft, FontStyles.Bold);
+                UIFactory.SetTopLeft((RectTransform)lbl.transform, 24f, 0f, cardW * 0.6f, 46f);
+                lbl.text = labels[i];
+
+                var val = UIFactory.CreateText(rowBg.transform, "Val", 20,
+                    new Color(0.2f, 0.28f, 0.28f), TextAlignmentOptions.MidlineRight, FontStyles.Bold);
+                UIFactory.SetTopLeft((RectTransform)val.transform, 0f, 0f, cardW - 24f, 46f);
+                statValueTexts[i] = val;
+            }
+        }
+
+        private void BuildMissionsPanel(Transform parent, float cardW, float cardH)
+        {
+            var panel = UIFactory.CreatePanel(parent, "MissionsPanel", Color.clear);
+            pauseMissionsPanel = panel.gameObject;
+            var rt = (RectTransform)panel.transform;
+            UIFactory.SetTopLeft(rt, 0f, 0f, cardW, cardH - 60f);
+
+            pauseHeaderText = UIFactory.CreateText(panel.transform, "MissionHeader", 22,
+                new Color(0.2f, 0.3f, 0.3f), TextAlignmentOptions.Center, FontStyles.Bold);
+            pauseHeaderText.text = "DAILY MISSIONS";
+            UIFactory.SetTopLeft((RectTransform)pauseHeaderText.transform, 0f, 10f, cardW, 36f);
+
+            for (int i = 0; i < 3; i++)
+                BuildMissionRow(panel.transform, i, cardW);
+
+            panel.gameObject.SetActive(false);
+        }
+
+        private void BuildMissionRow(Transform parent, int index, float cardW)
+        {
+            float rowY = 52f + index * 86f;
+            const float rowH = 80f;
+
+            var row = UIFactory.CreatePanel(parent, $"MissionRow{index}",
+                index % 2 == 0 ? new Color(0f, 0f, 0f, 0.06f) : Color.clear);
+            missionRowRects[index] = (RectTransform)row.transform;
+            UIFactory.SetTopLeft(missionRowRects[index], 0f, rowY, cardW, rowH);
+
+            // 순번 원
+            var numBg = UIFactory.CreatePanel(row.transform, "NumBg", new Color(0.3f, 0.5f, 0.5f));
+            UIFactory.SetTopLeft((RectTransform)numBg.transform, 14f, 18f, 30f, 30f);
+            var numText = UIFactory.CreateText(numBg.transform, "Num", 15,
+                Color.white, TextAlignmentOptions.Center, FontStyles.Bold);
+            numText.text = (index + 1).ToString();
+            UIFactory.StretchFull((RectTransform)numText.transform);
+
+            // 미션 설명
+            missionTexts[index] = UIFactory.CreateText(row.transform, "MText", 15,
+                new Color(0.2f, 0.3f, 0.3f), TextAlignmentOptions.TopLeft);
+            UIFactory.SetTopLeft((RectTransform)missionTexts[index].transform, 54f, 8f, 250f, 22f);
+
+            // 진행 바
+            var trackBg = UIFactory.CreatePanel(row.transform, "PTrack", new Color(0f, 0f, 0f, 0.2f));
+            UIFactory.SetTopLeft((RectTransform)trackBg.transform, 54f, 36f, 240f, 10f);
+            var fill = UIFactory.CreatePanel(trackBg.transform, "PFill", new Color(0.3f, 0.72f, 0.4f));
+            missionProgressFills[index] = fill;
+            var fillR = (RectTransform)fill.transform;
+            fillR.anchorMin = new Vector2(0f, 0f);
+            fillR.anchorMax = new Vector2(0f, 1f);
+            fillR.pivot     = new Vector2(0f, 0.5f);
+            fillR.anchoredPosition = Vector2.zero;
+            fillR.sizeDelta = Vector2.zero;
+
+            // 진행 수치
+            missionProgressTexts[index] = UIFactory.CreateText(row.transform, "PText", 12,
+                new Color(0.35f, 0.45f, 0.45f), TextAlignmentOptions.TopLeft);
+            UIFactory.SetTopLeft((RectTransform)missionProgressTexts[index].transform, 54f, 50f, 240f, 18f);
+
+            // 코인 보상 배지
+            var badge = UIFactory.CreatePanel(row.transform, "Badge", new Color(0.82f, 0.62f, 0.08f));
+            UIFactory.SetTopLeft((RectTransform)badge.transform, 306f, 14f, 58f, 28f);
+            var bText = UIFactory.CreateText(badge.transform, "BText", 13,
+                Color.white, TextAlignmentOptions.Center, FontStyles.Bold);
+            bText.text = "✦100";
+            UIFactory.StretchFull((RectTransform)bText.transform);
+
+            // 완료 체크마크
+            var check = UIFactory.CreatePanel(row.transform, "Check", new Color(0.2f, 0.72f, 0.32f));
+            missionCheckmarks[index] = check;
+            UIFactory.SetTopLeft((RectTransform)check.transform, 372f, 14f, 28f, 28f);
+            var cText = UIFactory.CreateText(check.transform, "CText", 16,
+                Color.white, TextAlignmentOptions.Center, FontStyles.Bold);
+            cText.text = "✓";
+            UIFactory.StretchFull((RectTransform)cText.transform);
+            check.gameObject.SetActive(false);
+        }
+
+        private RectTransform BuildCircleButton(Transform parent, string name, string icon, Color color, System.Action onClick)
+        {
+            var bg = UIFactory.CreatePanel(parent, name, color);
+            var rect = (RectTransform)bg.transform;
+            var lbl = UIFactory.CreateText(bg.transform, name + "Lbl", 32,
+                Color.white, TextAlignmentOptions.Center, FontStyles.Bold);
+            lbl.text = icon;
+            UIFactory.StretchFull((RectTransform)lbl.transform);
+            AddButtonHandler(bg.gameObject, onClick);
+            return rect;
+        }
+
+        // UGUI 버튼 핸들러 등록 — Canvas 루트에 EventSystem이 이미 있음
+        private static void AddButtonHandler(GameObject go, System.Action onClick)
+        {
+            var btn = go.GetComponent<UnityEngine.UI.Button>() ?? go.AddComponent<UnityEngine.UI.Button>();
+            btn.onClick.AddListener(() => onClick());
+        }
+
+        // ──────────────────────────────────────────────────────────────
+        // 일시정지 상태 제어
+        // ──────────────────────────────────────────────────────────────
+
+        private void HandleRunEnd()
+        {
+            if (isPaused) { isPaused = false; Time.timeScale = 1f; }
+        }
+
+        private void TogglePause()
+        {
+            if (isPaused) ResumeGame();
+            else          { isPaused = true; Time.timeScale = 0f; }
+        }
+
+        private void ResumeGame()
+        {
+            isPaused = false;
+            Time.timeScale = 1f;
+        }
+
+        private void RestartGame()
+        {
+            isPaused = false;
+            Time.timeScale = 1f;
+            pauseShowingStats = true;
+            gameManager.BeginRun();
+        }
+
+        private void GoHome()
+        {
+            isPaused = false;
+            Time.timeScale = 1f;
+            pauseShowingStats = true;
+            gameManager.ReturnToStart();
+        }
+
+        // STATS ↔ MISSIONS 토글
+        private void ToggleStatsView()
+        {
+            pauseShowingStats = !pauseShowingStats;
+            pauseStatsPanel.SetActive(pauseShowingStats);
+            pauseMissionsPanel.SetActive(!pauseShowingStats);
+            pauseToggleBtnText.text = pauseShowingStats ? "MISSIONS" : "STATS";
+        }
+
+        // ──────────────────────────────────────────────────────────────
+        // 일시정지 오버레이 매 프레임 갱신
+        // ──────────────────────────────────────────────────────────────
+
+        private void UpdatePauseOverlay()
+        {
+            UIFactory.SetTopLeft(pauseOverlayRect, 0f, 0f, Screen.width, Screen.height);
+
+            const float cardW = 460f, cardH = 400f;
+            const float btnSize = 80f, btnGap = 18f;
+            float totalW = cardW + 24f + btnSize;
+            float startX = (Screen.width - totalW) * 0.5f;
+            float startY = (Screen.height - cardH) * 0.5f;
+
+            UIFactory.SetTopLeft(pauseCardRect, startX, startY, cardW, cardH);
+
+            // 원형 버튼 세로 중앙 정렬
+            float totalBtnH = btnSize * 3f + btnGap * 2f;
+            float btnX = startX + cardW + 24f;
+            float btnY = startY + (cardH - totalBtnH) * 0.5f;
+            UIFactory.SetTopLeft(pauseResumeBtn,  btnX, btnY,                          btnSize, btnSize);
+            UIFactory.SetTopLeft(pauseRestartBtn, btnX, btnY + btnSize + btnGap,        btnSize, btnSize);
+            UIFactory.SetTopLeft(pauseHomeBtn,    btnX, btnY + (btnSize + btnGap) * 2f, btnSize, btnSize);
+
+            if (pauseShowingStats)  UpdateStatValues();
+            else                    UpdateMissionRows();
+        }
+
+        private void UpdateStatValues()
+        {
+            if (statValueTexts[0] == null) return;
+            statValueTexts[0].text = score.Score.ToString("N0");
+            statValueTexts[1].text = greatSlideCount.ToString();
+            statValueTexts[2].text = goldPickupCount.ToString();
+            statValueTexts[3].text = $"{gameManager.ScrollX / 1000f:0.0}km";
+            statValueTexts[4].text = gameManager.Island.ToString();
+            statValueTexts[5].text = bluePickupCount.ToString();
+            statValueTexts[6].text = greenPickupCount.ToString();
+        }
+
+        private void UpdateMissionRows()
+        {
+            bool hasMissions = nest != null && nest.ActiveMissions != null && nest.ActiveMissions.Length > 0;
+            string[] placeholder = { "섬 5개 건너기", "코인 100개 수집", "하늘 비행 3회 달성" };
+
+            for (int i = 0; i < 3; i++)
+            {
+                if (hasMissions && i < nest.ActiveMissions.Length)
+                {
+                    var m = nest.ActiveMissions[i];
+                    float progress = nest.GetProgress(m);
+                    bool done = progress >= m.Target;
+                    missionTexts[i].text = m.Description;
+                    float fillW = 240f * Mathf.Clamp01(progress / Mathf.Max(1f, m.Target));
+                    ((RectTransform)missionProgressFills[i].transform).sizeDelta = new Vector2(fillW, 0f);
+                    missionProgressTexts[i].text = done ? "완료!" : $"{Mathf.Min(progress, m.Target):0} / {m.Target:0}";
+                    missionCheckmarks[i].gameObject.SetActive(done);
+                }
+                else
+                {
+                    missionTexts[i].text = i < placeholder.Length ? placeholder[i] : $"미션 {i + 1}";
+                    ((RectTransform)missionProgressFills[i].transform).sizeDelta = Vector2.zero;
+                    missionProgressTexts[i].text = "- / -";
+                    missionCheckmarks[i].gameObject.SetActive(false);
+                }
+            }
         }
 
         private static void FillDot(Color[] pixels, int size, float cx, float cy, float r, Color color)
