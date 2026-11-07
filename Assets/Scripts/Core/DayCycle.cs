@@ -62,6 +62,14 @@ namespace HillyWings
             DayTime = 0f;
         }
 
+        // 섬 전환 비행이 끝났을 때 비행 시간만큼 낮을 되돌림.
+        // IslandFlightController 가 BirdController.OnIslandFlightEnd 를 받아 호출.
+        public void RewindElapsedTime(float seconds)
+        {
+            ElapsedTime = Mathf.Max(0f, ElapsedTime - seconds);
+            DayTime     = Mathf.Min(1f, ElapsedTime / dayDuration);
+        }
+
         // 섬 경계 통과 시 해를 되돌림. 보상은 섬 번호가 높아질수록 줄어들어 후반이 빡빡해짐.
         private void HandleIslandAdvanced(int island)
         {
