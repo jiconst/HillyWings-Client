@@ -159,6 +159,10 @@ namespace HillyWings
             var dropletSpawner = dropletGO.AddComponent<DropletSpawner>();
             dropletSpawner.Configure(bird, cam, burst, seed + 4);
 
+            var balloonGO = new GameObject("BalloonSpawner");
+            var balloonSpawner = balloonGO.AddComponent<BalloonSpawner>();
+            balloonSpawner.Configure(bird, cam, burst, seed + 5);
+
             var dayGO = new GameObject("DayCycle");
             var dayCycle = dayGO.AddComponent<DayCycle>();
             // 속도 연동: 빠를수록 해가 느리게 움직임 (Tiny Wings 방식)
@@ -214,6 +218,10 @@ namespace HillyWings
             var playerLevel = playerLevelGO.AddComponent<PlayerLevel>();
             playerLevel.Configure(gm, auth);
 
+            var islandFlightGO = new GameObject("IslandFlightController");
+            var islandFlight = islandFlightGO.AddComponent<IslandFlightController>();
+            islandFlight.Configure(bird, dayCycle);
+
             var audioGO = new GameObject("AudioManager");
             var audio = audioGO.AddComponent<AudioManager>();
             audio.Configure(bird, slideJudge, fever, coinSpawner, cloudSpawner, skyOrbSpawner, gm, dayCycle);
@@ -223,6 +231,7 @@ namespace HillyWings
             hud.BindCollectibles(coinSpawner, cloudSpawner, cam);
             hud.BindSkyOrb(skyOrbSpawner);
             hud.BindDroplet(dropletSpawner);
+            hud.BindBalloon(balloonSpawner);
             hud.BindDayCycle(dayCycle);
             hud.BindMeta(nest);
             hud.BindIdentity(profile, auth);

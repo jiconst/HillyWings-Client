@@ -58,6 +58,7 @@ namespace HillyWings
         private CloudSpawner cloudSpawner;
         private SkyOrbSpawner skyOrbSpawner;
         private DropletSpawner dropletSpawner;
+        private BalloonSpawner balloonSpawner;
         private NestMultiplier nest;
         private PlayerProfile profile;
         private AuthService auth;
@@ -232,6 +233,12 @@ namespace HillyWings
             dropletSpawner.OnDropletGreenCoin += HandleGreenPickup;
         }
 
+        public void BindBalloon(BalloonSpawner balloonSpawnerRef)
+        {
+            balloonSpawner = balloonSpawnerRef;
+            balloonSpawner.OnPickupPopup += HandlePickupPopup;
+        }
+
         private void HandlePickupPopup(Vector3 worldPos, string text, Color color)
         {
             pickupToasts.Add(new PositionedToast { Text = text, Color = color, WorldPos = worldPos, Duration = pickupToastDuration, TimeLeft = pickupToastDuration });
@@ -301,6 +308,8 @@ namespace HillyWings
                 dropletSpawner.OnDropletSpeedCoin -= HandleBluePickup;
                 dropletSpawner.OnDropletGreenCoin -= HandleGreenPickup;
             }
+            if (balloonSpawner != null)
+                balloonSpawner.OnPickupPopup -= HandlePickupPopup;
         }
 
         private void HandleGreatSlide(int streak, int gained)

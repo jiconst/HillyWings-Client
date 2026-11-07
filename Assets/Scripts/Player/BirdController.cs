@@ -26,6 +26,8 @@ namespace HillyWings
         public event Action OnGreatSlideLanding;
         public event Action OnMissedLanding;
         public event Action OnLaunch; // grounded -> airborne this frame; drives the jump SFX
+        // 섬 전환 비행 시작·종료 — IslandFlightController 와 DayCycle 이 구독
+        public event Action OnIslandFlightEnd;
 
         public bool OnGround => physics.OnGround;
         public bool Airborne => physics.Airborne;
@@ -44,6 +46,10 @@ namespace HillyWings
         public float TotalAirborneTime { get; private set; }
         // Sky Flight 오브 버프 활성 여부 -- CameraZoom이 빠른 줌아웃 전환에 사용.
         public bool IsSkyFlightActive => physics.IsSkyFlightActive;
+        // 섬 전환 비행 활성 여부 — TerrainGenerator 가 언덕을 숨기는 용도로 사용.
+        public bool IsIslandFlightActive { get; private set; }
+        // 섬 전환 비행이 끝날 때 DayCycle 되감기에 쓸 비행 지속 시간 기록
+        private float islandFlightDuration;
 
         private BirdPhysics physics;
         private Camera cam;
@@ -84,7 +90,8 @@ namespace HillyWings
 
             physics = new BirdPhysics(canvasStartX, radius, gm.Ground);
             physics.Reset(gm.ScrollX);
-            TotalAirborneTime = 0f;
+            TotalAirborneTime    = 0f;
+            IsIslandFlightActive = false;
 
             if (collection != null && collection.SelectedBird.Perk == PerkType.StartSpeedBonus)
                 physics.AddSpeed(collection.SelectedBird.PerkValue);
@@ -104,6 +111,18 @@ namespace HillyWings
         // the camera to zoom -- CameraZoom's existing height-based zoom then
         // follows the bird's actual altitude naturally.
         public void StartSkyFlight(float duration) => physics.StartSkyFlight(duration);
+
+        // 섬 전환 비행: 더 긴 체공 + IsIslandFlightActive 플래그.
+        // 비행 종료 시 OnIslandFlightEnd 발화 → DayCycle 되감기.
+        public void StartIslandFlight(float duration)
+        {
+            IsIslandFlightActive = true;
+            islandFlightDuration = duration;
+            physics.StartSkyFlight(duration);
+        }
+
+        // 풍선 터트리기: 순간 상방 충격
+        public void AddVerticalBoost(float yVelocityDelta) => physics.AddVerticalBoost(yVelocityDelta);
 
         private void FixedUpdate()
         {
@@ -125,6 +144,13 @@ namespace HillyWings
             ScoreManager.Instance.AddScore(baseDist * distanceScoreRate);
             if (physics.IsSkyFlightActive)
                 ScoreManager.Instance.AddScore(baseDist * skyFlightScoreRate);
+
+            // 섬 전환 비행 종료 감지: 스카이플라이트가 끝나면 플래그 해제 + 이벤트
+            if (IsIslandFlightActive && !physics.IsSkyFlightActive)
+            {
+                IsIslandFlightActive = false;
+                OnIslandFlightEnd?.Invoke();
+            }
 
             if (physics.JustLandedGreatSlide) OnGreatSlideLanding?.Invoke();
             if (physics.JustLandedMiss) OnMissedLanding?.Invoke();

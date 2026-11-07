@@ -100,6 +100,18 @@ namespace HillyWings
             Speed = Mathf.Min(SpeedMax, Speed + amount);
         }
 
+        // 풍선 터트리기 등 순간 상방 힘 — canvas-y는 아래 방향이므로 음수가 위쪽.
+        // 지상에 있으면 강제로 공중으로 띄운다.
+        public void AddVerticalBoost(float yVelocityDelta)
+        {
+            VerticalVelocity += yVelocityDelta;
+            if (OnGround)
+            {
+                OnGround = false;
+                Airborne = true;
+            }
+        }
+
         // Sky Flight orb: kicks off a real, physically-simulated soar rather
         // than just forcing the camera to zoom out -- see Step()'s gravity
         // override below. Only applies the launch kick if a flight isn't
