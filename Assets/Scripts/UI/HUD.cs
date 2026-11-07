@@ -987,10 +987,15 @@ namespace HillyWings
             return rect;
         }
 
-        // UGUI 버튼 핸들러 등록 — Canvas 루트에 EventSystem이 이미 있음
+        // UGUI 버튼 핸들러 등록 — Canvas 루트에 EventSystem이 이미 있음.
+        // CreatePanel은 기본적으로 raycastTarget=false로 만들어서,
+        // 버튼으로 쓸 Image는 여기서 반드시 true로 켜야 클릭이 감지됨.
         private static void AddButtonHandler(GameObject go, System.Action onClick)
         {
+            var img = go.GetComponent<UnityEngine.UI.Image>();
+            if (img != null) img.raycastTarget = true;
             var btn = go.GetComponent<UnityEngine.UI.Button>() ?? go.AddComponent<UnityEngine.UI.Button>();
+            if (img != null && btn.targetGraphic == null) btn.targetGraphic = img;
             btn.onClick.AddListener(() => onClick());
         }
 

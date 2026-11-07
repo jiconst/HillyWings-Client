@@ -3,8 +3,8 @@
 ## 프로젝트 개요
 
 Tiny Wings 스타일의 원버튼 슬라이딩 게임을 Unity(C#)로 개발한다.
-참조 자료: HTML5 프로토타입 `../MyProject/sample/hilly-wings.html`(핵심 물리·점수 로직
-완성본)과 Tiny Wings 스크린샷 17장(UI/메타 시스템 참조).
+참조 자료: Tiny Wings 스크린샷(UI/메타 시스템 참조). 핵심 물리·점수 로직은
+`Assets/Scripts/` 하위 C# 소스(`BirdPhysics.cs`, `GroundSampler.cs`, `ScoreManager.cs` 등)로 완전 구현됨.
 
 **핵심 게임 루프**: 화면을 누르면 새가 급강하하고, 떼면 상승한다. 내리막에서 눌러 가속 →
 오르막 정점에서 떼서 발사 → 착지 타이밍을 맞춰 "Great Slide" 연출. 하루(제한시간) 동안
@@ -117,27 +117,27 @@ Tiny Wings 스타일의 원버튼 슬라이딩 게임을 Unity(C#)로 개발한�
 
 ## 좌표계 — 중요, 반드시 이해하고 코드 작성할 것
 
-`hilly-wings.html`은 canvas 좌표계(원점 좌상단, y가 아래로 증가)로 작성돼 있다. 이 물리·
-지형 수식을 **그대로(상수까지 동일하게) 포팅**해서 검증된 손맛을 잃지 않기 위해,
-`GroundSampler`와 `BirdPhysics`는 **canvas 좌표계 그대로("canvas space")** 동작한다.
+`GroundSampler.cs`와 `BirdPhysics.cs`는 **canvas 좌표계(원점 좌상단, y가 아래로 증가)로
+동작**한다("canvas space"). 이 설계는 초기 프로토타입의 물리·지형 수식을 최대한 그대로
+보존해 검증된 손맛을 유지하기 위한 의도적 선택이다.
 Unity는 중앙원점·y-up이라, 변환은 딱 한 곳(`ScreenSpace.cs`)에서만 일어난다:
 
 - `ScreenSpace.ToWorldX(canvasX, viewHeight, aspect)` / `ToWorldY(canvasY, viewHeight)`
 - `TerrainGenerator`(메시 정점)와 `BirdController.ApplyTransform()`(Transform 대입) 두
   군데에서만 이 변환을 쓴다. 그 외 물리/지형 코드는 전부 canvas space로 계산한다.
 - 회전은 y-flip 때문에 방향이 반전되므로 `-physics.Angle`로 부호를 뒤집는다.
-- `viewHeight`(기본 720)는 HTML의 `window.innerHeight`에 대응하는 기준값. 카메라
+- `viewHeight`(기본 720)는 `GameManager.ViewHeight`에서 읽는 기준값. 카메라
   `orthographicSize = viewHeight/2`로 고정하고, 폭은 `viewHeight * camera.aspect`로 매
-  프레임 계산 (HTML의 `resize()`와 동일한 효과를 Unity의 `Camera.aspect`가 자동으로 해줌).
-- **월드가 스크롤되고 새는 화면에 고정**된다 (HTML의 `scrollX` 모델과 동일). 새의 화면 X는
-  `width * 0.28`로 고정, `GameManager.ScrollX`가 매 프레임 전진하면서 지형이 흘러가는
-  것처럼 보인다. 카메라는 이 모델에서 **한 번도 움직이지 않는다**.
+  프레임 계산 (Unity의 `Camera.aspect`가 화면 크기 변경을 자동으로 처리).
+- **월드가 스크롤되고 새는 화면에 고정**된다. 새의 화면 X는 `width * 0.28`로 고정,
+  `GameManager.ScrollX`가 매 프레임 전진하면서 지형이 흘러가는 것처럼 보인다.
+  카메라는 이 모델에서 **한 번도 움직이지 않는다**.
 
 ## 1단계 — 지형 (Terrain) — ✅ M1 구현 완료
 
-**HTML 원본의 고정 사인파 지형은 플레이테스트 피드백으로 랜덤 지형으로 교체함** (언덕 폭·
-높이가 항상 똑같이 반복되는 게 부자연스럽다는 요청). `groundY`/`groundSlope` 수식 자체는
-더 이상 원본과 동일하지 않음 — 아래가 현재 방식.
+**초기 고정 사인파 지형은 플레이테스트 피드백으로 랜덤 지형으로 교체함** (언덕 폭·
+높이가 항상 똑같이 반복되는 게 부자연스럽다는 요청). 현재 `GroundSampler.cs`의
+`GroundY()`/`GroundSlope()` 방식은 아래와 같다.
 
 `GroundSampler.cs`: **더 이상 static이 아님** — 시드 기반으로 컨트롤 포인트를 생성/보관하는
 인스턴스 클래스. `GameManager.Ground`가 런(run) 전체에서 유일하게 소유하고, `TerrainGenerator`
@@ -171,9 +171,10 @@ Unity는 중앙원점·y-up이라, 변환은 딱 한 곳(`ScreenSpace.cs`)에서
 `BirdPhysics.cs` (순수 C# 클래스, MonoBehaviour/Transform 비의존 — `BirdController`가
 Transform에 적용). Rigidbody2D 사용 안 함, `BirdController.FixedUpdate`에서 매 스텝 처리.
 
-물리 튜닝 기준값 (canvas-space 단위 = world unit). 다이브/발사 임계값은 HTML 원본에서
-플레이테스트 피드백으로 완화됨(원본 값은 표에 괄호로 표기) — "3연속 스트릭 달성이 너무
-빡빡하다"는 요청으로, 더 관대한 경사각/속도에서도 다이빙 인정 + 발사가 되도록 낮춤:
+물리 튜닝 기준값 (canvas-space 단위 = world unit, `BirdPhysics.cs` const 필드).
+다이브/발사 임계값은 초기 프로토타입 값에서 플레이테스트 피드백으로 완화됨(초기 값은 표에
+괄호로 표기) — "3연속 스트릭 달성이 너무 빡빡하다"는 요청으로, 더 관대한 경사각/속도에서도
+다이빙 인정 + 발사가 되도록 낮춤:
 
 | 항목 | 값 | 설명 |
 |---|---|---|
@@ -190,7 +191,7 @@ Transform에 적용). Rigidbody2D 사용 안 함, `BirdController.FixedUpdate`�
 언덕 폭도 재차 요청으로 넓힘: `GroundSampler`의 `minHalfWave`/`maxHalfWave`가
 `viewHeight*0.30~0.42` → `0.36~0.50`. 높이 범위(`minAmp`/`maxAmp`)는 그대로 둠.
 
-핵심 알고리즘 (HTML `update()`와 동일한 순서):
+핵심 알고리즘 (`BirdPhysics.Step()` 처리 순서):
 1. 매 스텝 자유낙하로 y 적분 (`vy += g*dt; y += vy*dt`, g는 홀드 여부로 GRAV_AIR/HOLD)
 2. `y >= groundY`면 지면 처리: 이전에 공중이었고 **체공 시간이 `MinAirborneTimeForJudging`
    (0.15초) 이상이었다면** 착지 판정(`holdWasDownhill`로 Great Slide/Miss 결정) 후 지면에
@@ -213,8 +214,7 @@ Transform에 적용). Rigidbody2D 사용 안 함, `BirdController.FixedUpdate`�
 - 새는 X 고정(`width*0.28`), 세계가 스크롤 (`GameManager.AdvanceScroll(speed*dt)`)
 - 새 회전각: `atan2(vy, speed)`를 향해 `dt*10` 속도로 lerp (canvas space에서 계산 후
   Unity 적용 시 부호 반전)
-- dt는 Unity `Time.fixedDeltaTime` 사용 (HTML의 0.05초 클램프에 대응하는 별도 클램프는
-  Fixed Timestep이 고정이라 불필요)
+- dt는 Unity `Time.fixedDeltaTime` 사용 (Fixed Timestep이 고정이라 별도 dt 클램프는 불필요)
 
 ### 새 비주얼 (`BirdVisual.cs`) — 요청하신 "귀여운 병아리"
 
@@ -253,11 +253,10 @@ Transform에 적용). Rigidbody2D 사용 안 함, `BirdController.FixedUpdate`�
 ### 기타 득점원 — ✅ M3 구현 완료 (`Collectibles/`)
 
 - `CoinField.cs`/`CloudField.cs`: 순수 C# 데이터 클래스 (`GroundSampler`와 같은 패턴 —
-  시드 기반 `EnsureCoverage(x)`로 앞쪽을 필요할 때마다 채움). HTML의 `ensureCoins`/
-  `ensureClouds`를 그대로 포팅: 코인은 90~150 유닛 간격, 10% 확률로 스피드코인 단독 배치,
+  시드 기반 `EnsureCoverage(x)`로 앞쪽을 필요할 때마다 채움). 코인은 90~150 유닛 간격, 10% 확률로 스피드코인 단독 배치,
   65% 확률로 3~7개짜리 코인 러시(아치형 오프셋), 25%는 빈 구간. 구름은 380~800 유닛
   간격으로 화면 상단 10~24% 높이 밴드에 배치
-  - **스피드코인 높이 낮춤**: HTML 원본 offset(지면 위 60~100)이 지금 튜닝(낮아진 언덕 높이
+  - **스피드코인 높이 낮춤**: 초기 offset(지면 위 60~100)이 현재 튜닝(낮아진 언덕 높이
     + 완화된 발사 임계값)으로는 새가 닿지 못하는 높이였음 → `28~54`로 낮춤. 언덕 높이나
     발사 관련 상수를 또 바꾸면 이 값도 같이 재확인할 것.
 - `CoinSpawner.cs`/`CloudSpawner.cs`: 각각 고정 크기 오브젝트 풀(코인 48개, 구름 24개)로
@@ -316,8 +315,8 @@ Transform에 적용). Rigidbody2D 사용 안 함, `BirdController.FixedUpdate`�
 ### 코인 지갑 (`Meta/CoinWallet.cs`)
 - `GameManager.OnRunEnd`(day-over 직전, 스탯이 아직 살아있는 시점)를 구독해서 자동으로
   코인 지급 — 다른 시스템이 명시적으로 호출할 필요 없음
-- **점수→코인 환산 비율은 발명한 값** (`hilly-wings.html`엔 메타 레이어 자체가 없어서
-  참고할 원본이 없음): `score / 50` 내림. `CoinWallet.scoreToCoinsRatio` 하나로 조절
+- **점수→코인 환산 비율**: `score / 50` 내림. `CoinWallet.scoreToCoinsRatio` 하나로 조절
+  (메타 레이어가 없는 초기 프로토타입에는 없던 개념이라 별도로 설계한 값)
 
 ### Nest Multiplier (`Meta/NestMultiplier.cs`)
 - 매 런(`OnRunStart`)마다 `MissionPool.Nest`(5개 후보) 중 3개를 무작위로 뽑음
@@ -389,11 +388,10 @@ M3), **카메라 줌**(`FX/CameraZoom.cs`), **다이브 먼지/Fever 별 트레�
 (`Audio/`, 아래 상세), **성능(정적 코드 리뷰 기반 GC 할당 제거, 아래 상세)**,
 **OnGUI → UGUI/TextMeshPro 교체(아래 상세)**, **뒷배경 패럴랙스 언덕 + 잔디 tuft(아래 상세)
 — 전부 플레이 확인 필요** 완료. 남은 것:
-- (스킵, 계속 보류) 태양 주변 glow — Unity `SpriteRenderer`로는 HTML의 `ctx.shadowBlur`
-  재현이 번거로워 생략, 필요하면 나중에 Bloom 포스트프로세싱으로
-- (스킵, 계속 보류) 언덕 크레스트 위 밝은 rim 하이라이트 라인 — `drawHills()`에 있지만 잔디
-  tuft만큼 눈에 띄는 효과가 아니라서 이번엔 생략, 필요하면 `GrassTuftGenerator`와 같은
-  패턴으로 추가 가능
+- (스킵, 계속 보류) 태양 주변 glow — Unity `SpriteRenderer`로는 빛번짐 재현이 번거로워
+  생략, 필요하면 나중에 Bloom 포스트프로세싱으로
+- (스킵, 계속 보류) 언덕 크레스트 위 밝은 rim 하이라이트 라인 — 잔디 tuft만큼 눈에 띄는
+  효과가 아니라서 이번엔 생략, 필요하면 `GrassTuftGenerator`와 같은 패턴으로 추가 가능
 
 ### OnGUI → UGUI/TextMeshPro 교체
 사용자에게 세 가지 선택지(UGUI+TMP / UI Toolkit / 지금은 보류)를 물어봤고 **UGUI(Canvas +
@@ -570,57 +568,52 @@ Canvas 계층을 코드로 만들어 두고(에디터 수동 설정 없음, 기�
   duration 안에서 정수 사이클이 되게 주파수/길이를 맞추는 것.**
 
 ### 하늘/팔레트 (`Terrain/IslandPalette.cs`, `FX/SkyRenderer.cs`, `FX/SkyObjects.cs`)
-- `IslandPalette.cs`: HTML `PALETTES` 배열 10개를 색상 hex 그대로 포팅
+- `IslandPalette.cs`: 섬별 10가지 색상 팔레트를 hex 문자열로 정의
   (`ColorUtility.TryParseHtmlString` 기반 `Core/ColorUtil.cs`로 파싱). `ForIsland(island)`가
   `(island-1) % 10`으로 순환
 - `TerrainGenerator`: 이제 언덕 색이 하드코딩 3색이 아니라 `IslandPalettes.ForIsland(gm.Island)`
-  기반 4단 그라데이션(HTML `drawHills()`의 CSS 그라데이션 stop 0/0.25/0.55/1과 동일 지점)이고,
+  기반 4단 그라데이션(stop 0/0.25/0.55/1 위치)이고,
   `night = dayTime^1.4`만큼 어두운 색(`#1a1a3a` 등)으로 lerp됨 — 섬이 바뀌면 팔레트가,
   시간이 지나면 어둡기가 자동으로 반영됨. 이걸 위해 `SetDayCycle(DayCycle)`을 새로 받음
   (부트스트랩에서 DayCycle 생성 직후 배선)
 - `SkyRenderer.cs`: 기존 `SkyTint.cs`(카메라 배경색 단색 lerp)를 대체 — 화면을 항상 덮는
   큰 정적 quad 메시 하나에 정점색 2개(위/아래)만 매 프레임 갱신하는 방식으로 실제
   그라데이션 하늘을 그림. `dayTime > 0.55`부터는 노을(주황) 색이 아래쪽에 섞여 들어감
-  (HTML의 dusk band와 동일 공식). 카메라 `backgroundColor`는 이제 실질적으로 안 보임(항상
+  카메라 `backgroundColor`는 이제 실질적으로 안 보임(항상
   이 quad에 덮임) — 그냥 안전 폴백으로 남겨둠
 - `SkyObjects.cs`: 해/달 원판(하루 동안 위→아래로 하강, `dayTime>0.8`부터 달로 교체) +
-  반짝이는 별 40개(`night>0.2`부터 페이드인, 개별 트윈클). **HTML 원본처럼 스크롤과
-  무관하게 화면에 고정된 위치**에 그림 — 즉 이 좌표들은 `gm.ScrollX`를 더하지 않고
+  반짝이는 별 40개(`night>0.2`부터 페이드인, 개별 트윈클). **스크롤과 무관하게 화면에
+  고정된 위치**에 그림 — 즉 이 좌표들은 `gm.ScrollX`를 더하지 않고
   `ScreenSpace.ToWorldX/Y`에 바로 넣음 (다른 모든 오브젝트는 `gm.ScrollX + canvasX`를
   쓰는 것과 대조적임, 헷갈리지 말 것)
-- **M7에서 안 한 것**: 태양 주변 glow(HTML은 `ctx.shadowBlur`로 은은한 빛번짐을 넣지만 Unity
-  SpriteRenderer로는 그대로 재현이 번거로워 생략 — 필요하면 Bloom 포스트프로세싱으로 나중에
-  처리하는 게 나음), 언덕 크레스트 rim 하이라이트 라인
+- **M7에서 안 한 것**: 태양 주변 glow(Unity `SpriteRenderer`로는 빛번짐 재현이 번거로워
+  생략 — 필요하면 Bloom 포스트프로세싱으로 나중에 처리하는 게 나음), 언덕 크레스트 rim 하이라이트 라인
 
 ### 배경 패럴랙스 언덕 / 잔디 tuft (`Terrain/BackgroundHillGenerator.cs`, `Terrain/GrassTuftGenerator.cs`)
-M7에서 우선순위 낮다고 스킵했던 두 항목 — `hilly-wings.html`의 `drawHills()`에서 그대로 포팅.
+M7에서 우선순위 낮다고 스킵했던 두 항목 — 패럴랙스 배경 언덕과 잔디 tuft.
 
-- **`BackgroundHillGenerator.cs`**: `drawHills()`의 "background echo hills (parallax,
-  lighter)" 부분. **같은** `GameManager.Ground`(`GroundSampler`)를 다시 샘플링하되,
+- **`BackgroundHillGenerator.cs`**: 배경 패럴랙스 언덕. **같은** `GameManager.Ground`(`GroundSampler`)를 다시 샘플링하되,
   월드 X를 `ScrollX * 0.55`로 늦게 스크롤시키고(`parallaxFactor`) Y를 `+70`(`verticalOffset`)
   내려서 진짜 전경 언덕(`TerrainGenerator`) 뒤에서 더 느리게 흘러가는 것처럼 보이게 함 —
   **화면상 정점 위치(`canvasX`)는 그대로 두고, `GroundY()`를 샘플링할 때만 다른(느린) 월드
-  X를 쓰는 게 패럴랙스 트릭의 핵심** (레퍼런스 `wx = scrollX*0.55 + x; lineTo(x, groundY(wx))`
-  와 동일 — `x`는 화면 좌표, `wx`만 느리게 감). 색은 그라데이션 없이 단색
-  (`pal.HillTop`을 밤에 `#20204a`로 lerp) + 반투명(`alpha=0.5`). `TerrainGenerator`와
-  똑같은 재사용 메시/버퍼 패턴, 줌 대응 좌우/하단 경계 계산까지 동일하게 적용(줌아웃 시
+  X를 쓰는 게 패럴랙스 트릭의 핵심** (`x`는 화면 좌표, `wx = scrollX*0.55 + x`만 느리게 감).
+  색은 그라데이션 없이 단색(`pal.HillTop`을 밤에 `#20204a`로 lerp) + 반투명(`alpha=0.5`).
+  `TerrainGenerator`와 똑같은 재사용 메시/버퍼 패턴, 줌 대응 좌우/하단 경계 계산까지 동일하게 적용(줌아웃 시
   빈 공간 생기는 버그를 애초에 피함). `sortingOrder=-5`로 하늘(`-15~-20`)보다 앞, 메인
   지형(기본값 0)보다 뒤에 그려지도록 배치.
-- **`GrassTuftGenerator.cs`**: `drawHills()`의 "grass tufts along crest" 부분. 26 캔버스
-  유닛 간격으로, 경사가 완만한 곳(`|slope| < 0.5`)에서만 짧은 대각선 잔디 하나씩 — 레퍼런스가
-  `ctx.lineWidth`로 그리는 선을, Unity에서는 얇은 사각형(쿼드, 삼각형 2개) 메시로 직접
-  만들어서 표현함(틴트 없는 단색 채움). 라인렌더러/오브젝트를 잔디마다 하나씩 만드는 대신
+- **`GrassTuftGenerator.cs`**: 언덕 능선 위 잔디 tuft. 26 캔버스
+  유닛 간격으로, 경사가 완만한 곳(`|slope| < 0.5`)에서만 짧은 대각선 잔디 하나씩 —
+  Unity에서는 얇은 사각형(쿼드, 삼각형 2개) 메시로 직접 만들어서 표현함(틴트 없는 단색 채움).
+  라인렌더러/오브젝트를 잔디마다 하나씩 만드는 대신
   **재사용 메시 하나에 전부 합쳐서** 매 프레임 다시 채움 — `TerrainGenerator` M7 성능 패스
   때와 같은 이유(매 프레임 GameObject/Instantiate 반복 금지 원칙). `sortingOrder=1`로 메인
-  지형 위에 그려짐. 색은 `pal.Grass`(`IslandPalette`에 이미 있던 필드, M7 초기에 팔레트
-  포팅할 때 미리 넣어둬서 이번에 바로 씀)를 밤에 `#2a2a4a`로 lerp.
+  지형 위에 그려짐. 색은 `pal.Grass`(`IslandPalette`에 이미 있던 필드)를 밤에 `#2a2a4a`로 lerp.
 - 둘 다 `GameBootstrapper`에서 `DayCycle` 생성 직후 배선(`SetDayCycle`), `TerrainGenerator`
   와 같은 `Camera.main`/`GameManager.Ground` 참조 패턴.
 
 ### 다이브 먼지 / Fever 별 트레일 (`FX/BirdTrailParticles.cs`)
-- HTML의 `spawnDust()`(다이빙 중 프레임당 50% 확률)/`spawnStar()`(Fever 중 프레임당 60%
-  확률)를 그대로 포팅 — 원본이 60fps 가정 확률이라, `Time.deltaTime*60`으로 스케일해서
-  프레임레이트 달라도 기대 발생 빈도가 같도록 함
+- 다이빙 중 프레임당 50% 확률로 먼지, Fever 중 프레임당 60% 확률로 별 — 60fps 가정
+  확률이라, `Time.deltaTime*60`으로 스케일해서 프레임레이트 달라도 기대 발생 빈도가 같도록 함
 - `FX/PickupBurst.cs`(한 번 터지고 끝나는 공유 파티클)와 달리, 이건 **새에 매달려 계속
   스스로 판단해서 `Emit(1)`을 호출하는 전용 파티클 시스템 2개**(먼지/별). 새의 자식으로
   붙여서 발사 위치는 새를 따라가지만, `simulationSpace = World`라서 이미 나온 입자는
@@ -1417,13 +1410,13 @@ STATS 하위 탭으로 통합 · 설정 진입 시 로그인/회원가입 선택
   `Collectibles/`, `FX/PickupBurst.cs` 참고. 앞으로 추가되는 것도 이 패턴 따를 것)
 - 원작 Tiny Wings의 아트 에셋·사운드 복제 (스타일 참고만, 에셋은 전부 자체 제작)
 - 인앱 결제/광고/서버 연동 (전부 로컬)
-- `groundY`/`groundSlope`/물리 상수를 "정리"한답시고 값 바꾸지 말 것 — HTML 원본과 어긋나면
-  검증된 손맛이 깨짐. 바꾸고 싶으면 먼저 `hilly-wings.html`에서 값을 바꿔 손맛을 확인한 뒤
-  포팅할 것.
+- `GroundSampler`/`BirdPhysics`의 물리 상수를 "정리"한답시고 함부로 바꾸지 말 것 —
+  이 값들은 플레이테스트로 검증된 손맛이 담겨 있어서, 하나 바꾸면 체감이 크게 달라짐.
+  바꾸고 싶으면 반드시 에디터에서 직접 플레이해서 손맛을 확인한 뒤 반영할 것.
 
 ## 테스트 체크리스트
 
-- [x] 내리막 다이브 → 정점 발사 → 착지가 HTML 프로토타입과 유사한 손맛인지 (M1)
+- [x] 내리막 다이브 → 정점 발사 → 착지 손맛 확인 (`BirdPhysics.Step()` 흐름) (M1)
 - [x] streak 3 → Fever 발동, 실패 착지 → 즉시 종료 확인 (M2)
 - [x] 섬 전환 시 배수/속도킥 동작, HUD의 Island/배수/점수/Fever뱃지/streak 점이 맞는지 (M2)
 - [x] 코인/스피드코인/구름 픽업이 실제로 닿는 높이에 배치되는지 (M3)
