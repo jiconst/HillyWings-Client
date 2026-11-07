@@ -10,7 +10,7 @@ namespace HillyWings
     // SpeedBase 이상으로 충분히 빠르면 해가 뒤로 밀린다 — 잘 플레이할수록 낮이 연장됨.
     public class DayCycle : MonoBehaviour
     {
-        [SerializeField] private float dayDuration = 90f;
+        [SerializeField] private float dayDuration = 65f;
         // 기준 속도 (BirdPhysics.SpeedBase와 일치) — 이 속도에서 낮이 정상 속도로 흐름
         [SerializeField] private float speedRef = 360f;
         // 속도 1 unit 차이당 낮 진행 배율 조절량.

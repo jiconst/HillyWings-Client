@@ -36,8 +36,8 @@ namespace HillyWings
             {
                 float baseX = entries.Count > 0 ? entries[entries.Count - 1].WorldX : startX;
                 float wx = baseX + 380f + (float)rng.NextDouble() * 420f;
-                float y = viewHeight * 0.10f + (float)rng.NextDouble() * viewHeight * 0.14f;
-                float s = 0.8f + (float)rng.NextDouble() * 0.7f;
+                float y = viewHeight * 0.08f + (float)rng.NextDouble() * viewHeight * 0.16f;
+                float s = 1.4f + (float)rng.NextDouble() * 1.0f;
                 entries.Add(new CloudEntry { WorldX = wx, CanvasY = y, Scale = s, Touched = false });
             }
         }

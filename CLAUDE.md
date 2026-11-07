@@ -41,10 +41,10 @@ Tiny Wings 스타일의 원버튼 슬라이딩 게임을 Unity(C#)로 개발한�
 
 | 속도 | 낮 진행 배율 | 체감 하루 길이 |
 |------|------------|-------------|
-| 300 (저속) | 1.12× | ~80초 (더 빨리 밤이 옴) |
-| 360 (기준) | 1.00× | 90초 |
-| 500 | 0.72× | ~125초 |
-| 700 | 0.32× | ~280초 |
+| 300 (저속) | 1.12× | ~58초 (더 빨리 밤이 옴) |
+| 360 (기준) | 1.00× | **65초** |
+| 500 | 0.72× | ~90초 |
+| 700 | 0.32× | ~203초 |
 | 900+ | **음수** | 해가 뒤로 밀림 |
 
 ### 급경사 언덕 페널티 (`UphillDecelRate = 300`)
@@ -255,7 +255,15 @@ Transform에 적용). Rigidbody2D 사용 안 함, `BirdController.FixedUpdate`�
 - `CoinField.cs`/`CloudField.cs`: 순수 C# 데이터 클래스 (`GroundSampler`와 같은 패턴 —
   시드 기반 `EnsureCoverage(x)`로 앞쪽을 필요할 때마다 채움). 코인은 90~150 유닛 간격, 10% 확률로 스피드코인 단독 배치,
   65% 확률로 3~7개짜리 코인 러시(아치형 오프셋), 25%는 빈 구간. 구름은 380~800 유닛
-  간격으로 화면 상단 10~24% 높이 밴드에 배치
+  간격으로 화면 상단 8~24% 높이 밴드에 배치. **구름 스케일은 1.4~2.4** (이전 0.8~1.5보다 크게)
+- `DropletField.cs`/`DropletSpawner.cs`: 언덕 위 물방울 수집 아이템. 순수 데이터 + 풀링 렌더러 분리 패턴.
+  - **크기**: `Small`/`Medium`/`Large` 3단계, 섬이 높아질수록 큰 것이 더 자주 등장
+  - **속도 부스트**: 크기별 +80 / +160 / +260 (`BirdController.AddSpeedBoost`)
+  - **팝업 텍스트**: `DRIP!` / `DROP!` / `SPLASH!`
+  - **내용물**: 노란 코인(`GoldCoin`, +3점) / 파란 코인(`SpeedCoin`, 추가 +80 속도 부스트) / 녹색 코인(`GreenCoin`, +5점) / 없음(`None`)
+  - **내용물 확률**: `GoldCoinChance=0.20`, `SpeedCoinChance=0.10`, `GreenCoinChance=0.08` (public 필드, 외부 조절 가능)
+  - **섬 난이도 반영**: 높은 섬일수록 배치 간격 좁아짐(밀도 증가), 큰 사이즈 비율 상승, 코인 함유 확률 소폭 상승
+  - **HUD 연결**: `DropletSpawner.OnDropletGoldCoin`/`OnDropletSpeedCoin`/`OnDropletGreenCoin`이 기존 gold/blue/green 픽업 카운터에 집계됨
   - **스피드코인 높이 낮춤**: 초기 offset(지면 위 60~100)이 현재 튜닝(낮아진 언덕 높이
     + 완화된 발사 임계값)으로는 새가 닿지 못하는 높이였음 → `28~54`로 낮춤. 언덕 높이나
     발사 관련 상수를 또 바꾸면 이 값도 같이 재확인할 것.
@@ -278,7 +286,7 @@ Transform에 적용). Rigidbody2D 사용 안 함, `BirdController.FixedUpdate`�
   지형) 후 `OnRunStart` 이벤트 발생 — 다른 모든 시스템(새 물리, 점수, 스트릭, Fever,
   코인/구름 스포너)은 이 이벤트 하나만 구독해서 각자 스스로 리셋함. GameManager는 그
   시스템들의 내부를 전혀 모름 (완전 이벤트 기반 디커플링)
-- **`Core/DayCycle.cs`**: `DAY_LENGTH=90초`, `State==Playing`일 때만 진행, dayTime 0→1,
+- **`Core/DayCycle.cs`**: `dayDuration=65초`(기본값, 이전 90초에서 단축됨), `State==Playing`일 때만 진행, dayTime 0→1,
   1 도달 시 `GameManager.EndRun()` 호출
 - **`FX/SkyTint.cs`**: dayTime 기준 카메라 배경색을 낮→노을(0.55 지점)→밤으로 lerp.
   **M4에서 안 한 것**: 태양/달 원판, 별, 실제 그라데이션 하늘(단색만) — M6/M7
@@ -1687,3 +1695,40 @@ STATS 하위 탭으로 통합 · 설정 진입 시 로그인/회원가입 선택
    `UI/StartScreen.cs`에 `authSubmitInFlight` 가드를 추가해서, 서버 응답이 오기
    전까지는 엔터를 연타해도 중복 요청이 나가지 않도록 함(에러 메시지는 고쳤지만,
    애초에 응답 대기 중 중복 제출을 막는 게 더 근본적인 안전장치).
+
+## 10단계 — 구름 확대 / 물방울 아이템 / 낮밤 긴장감 조정 (Post-M9)
+
+### 구름 크기 확대 (`Collectibles/CloudField.cs`)
+- 구름 스케일 범위를 `0.8~1.5` → **`1.4~2.4`** 로 대폭 증가 — 화면에서 더 존재감 있는 구름.
+  Y 밴드도 상단 8~24%로 소폭 조정(기존 10~24%)해서 더 넓은 하늘 영역에 분포.
+- `CloudSpawner`는 변경 없음 — 렌더링 시 `entry.Scale`을 `sr.transform.localScale`에 곱하는 기존 방식을 그대로 사용.
+
+### 물방울 수집 아이템 (`Collectibles/DropletField.cs`, `Collectibles/DropletSpawner.cs`)
+언덕 위에 배치되는 새 수집 아이템. `CoinField`/`SkyOrbField` 패턴을 그대로 따름.
+
+**DropletField.cs** (순수 데이터):
+- `DropletSize` enum: `Small` / `Medium` / `Large`
+- `DropletContent` enum: `None` / `GoldCoin` / `SpeedCoin` / `GreenCoin`
+- `DropletEntry` struct: `WorldX`, `Offset`, `Size`, `Content`, `Taken`
+- 섬 번호 기반 난이도: 간격 900~1600(Island 1) → 300~500(Island 11+), 큰 물방울 확률 5%(Island 1) → 최대 35%, 코인 함유 섬 보너스 Island당 +1.5%p
+- 코인 확률 기본값: `GoldCoinChance=0.20`, `SpeedCoinChance=0.10`, `GreenCoinChance=0.08` (public 필드, 외부 조절 가능)
+- 오프셋 8~22 (지면 근처, 코인 14~26보다 약간 낮게)
+
+**DropletSpawner.cs** (풀링 비주얼 + 충돌):
+- 풀 32개, `SpriteRenderer` + `ProceduralSprite.CreateCircle(28, 하늘색)`
+- 충돌 반지름: Small=18 / Medium=26 / Large=36
+- 시각 스케일: Small=0.65× / Medium=1.0× / Large=1.5×
+- 속도 부스트: Small=+80 / Medium=+160 / Large=+260 (`BirdController.AddSpeedBoost`)
+- 팝업: `DRIP!` / `DROP!` / `SPLASH!` (하늘색 `0.35, 0.72, 1.0`)
+- 내용물 처리: GoldCoin → `ScoreManager.AddScore(3f)` + 버스트 + `OnDropletGoldCoin` / SpeedCoin → 추가 `AddSpeedBoost(80f)` + 버스트 + `OnDropletSpeedCoin` / GreenCoin → `AddScore(5f)` + 버스트 + `OnDropletGreenCoin`
+- `GameBootstrapper`에서 `seed+4`로 초기화, `HUD.BindDroplet(dropletSpawner)`로 픽업 카운터 연결
+- `OnRunStart` 구독으로 런마다 field 재초기화 + 풀 비활성화
+
+**HUD 연결 (`HUD.BindDroplet`)**:
+- `OnDropletGoldCoin` → `HandleGoldPickup` (우측 상단 금색 카운터 ++), `OnDropletSpeedCoin` → `HandleBluePickup`, `OnDropletGreenCoin` → `HandleGreenPickup`
+- `OnDestroy`에서 4개 이벤트 모두 구독 해제
+
+### 낮/밤 사이클 긴장감 조정 (`Core/DayCycle.cs`)
+- `dayDuration` **90초 → 65초** (약 28% 단축) — 해가 더 빨리 지도록 해서 긴장감과 쫄깃함 상승
+- 속도 연동(`speedInfluence`), 섬 배율(`islandDayRateScale`), 섬 도달 보상(`islandTimeReward`) 등 나머지 로직은 변경 없음
+- 밸런스 체감 기준값(360 기준 속도): 65초 (이전 90초). 최고 속도(980)에서는 여전히 해가 뒤로 밀림(`rate < 0`)

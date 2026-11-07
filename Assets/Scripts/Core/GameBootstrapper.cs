@@ -155,6 +155,10 @@ namespace HillyWings
             var skyOrbSpawner = skyOrbGO.AddComponent<SkyOrbSpawner>();
             skyOrbSpawner.Configure(bird, cam, burst, seed + 3);
 
+            var dropletGO = new GameObject("DropletSpawner");
+            var dropletSpawner = dropletGO.AddComponent<DropletSpawner>();
+            dropletSpawner.Configure(bird, cam, burst, seed + 4);
+
             var dayGO = new GameObject("DayCycle");
             var dayCycle = dayGO.AddComponent<DayCycle>();
             // 속도 연동: 빠를수록 해가 느리게 움직임 (Tiny Wings 방식)
@@ -218,6 +222,7 @@ namespace HillyWings
             hud.Bind(bird, score, slideJudge, fever, gm);
             hud.BindCollectibles(coinSpawner, cloudSpawner, cam);
             hud.BindSkyOrb(skyOrbSpawner);
+            hud.BindDroplet(dropletSpawner);
             hud.BindDayCycle(dayCycle);
             hud.BindMeta(nest);
             hud.BindIdentity(profile, auth);

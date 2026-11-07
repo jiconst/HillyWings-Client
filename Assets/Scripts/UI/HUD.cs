@@ -57,6 +57,7 @@ namespace HillyWings
         private CoinSpawner coinSpawner;
         private CloudSpawner cloudSpawner;
         private SkyOrbSpawner skyOrbSpawner;
+        private DropletSpawner dropletSpawner;
         private NestMultiplier nest;
         private PlayerProfile profile;
         private AuthService auth;
@@ -222,6 +223,15 @@ namespace HillyWings
             skyOrbSpawner.OnOrbCollected += HandleGreenPickup;
         }
 
+        public void BindDroplet(DropletSpawner dropletSpawnerRef)
+        {
+            dropletSpawner = dropletSpawnerRef;
+            dropletSpawner.OnPickupPopup      += HandlePickupPopup;
+            dropletSpawner.OnDropletGoldCoin  += HandleGoldPickup;
+            dropletSpawner.OnDropletSpeedCoin += HandleBluePickup;
+            dropletSpawner.OnDropletGreenCoin += HandleGreenPickup;
+        }
+
         private void HandlePickupPopup(Vector3 worldPos, string text, Color color)
         {
             pickupToasts.Add(new PositionedToast { Text = text, Color = color, WorldPos = worldPos, Duration = pickupToastDuration, TimeLeft = pickupToastDuration });
@@ -283,6 +293,13 @@ namespace HillyWings
             {
                 skyOrbSpawner.OnPickupPopup -= HandlePickupPopup;
                 skyOrbSpawner.OnOrbCollected -= HandleGreenPickup;
+            }
+            if (dropletSpawner != null)
+            {
+                dropletSpawner.OnPickupPopup      -= HandlePickupPopup;
+                dropletSpawner.OnDropletGoldCoin  -= HandleGoldPickup;
+                dropletSpawner.OnDropletSpeedCoin -= HandleBluePickup;
+                dropletSpawner.OnDropletGreenCoin -= HandleGreenPickup;
             }
         }
 
