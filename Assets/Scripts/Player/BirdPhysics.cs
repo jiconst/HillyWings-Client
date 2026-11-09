@@ -130,10 +130,12 @@ namespace HillyWings
         // through the exact same integrator normal flight uses (Step()
         // below), so it reads as the bird actually flying, not a scripted
         // hover.
-        public void StartSkyFlight(float duration)
+        // launchScale: 초기 위쪽 속도 배율. 1.0 = 대칭 포물선(duration/2 에 최고점).
+        // 0.5~0.7 범위로 줄이면 같은 duration 동안 체공하되 최고 높이가 낮아짐.
+        public void StartSkyFlight(float duration, float launchScale = 1f)
         {
             if (skyFlightTimeRemaining <= 0f)
-                VerticalVelocity = -SkyFlightGravity * duration * 0.5f;
+                VerticalVelocity = -SkyFlightGravity * duration * 0.5f * launchScale;
 
             skyFlightTimeRemaining = Mathf.Max(skyFlightTimeRemaining, duration);
         }

@@ -110,7 +110,7 @@ namespace HillyWings
         // seconds (see BirdPhysics.StartSkyFlight) instead of just forcing
         // the camera to zoom -- CameraZoom's existing height-based zoom then
         // follows the bird's actual altitude naturally.
-        public void StartSkyFlight(float duration) => physics.StartSkyFlight(duration);
+        public void StartSkyFlight(float duration, float launchScale = 1f) => physics.StartSkyFlight(duration, launchScale);
 
         // 섬 전환 비행: 더 긴 체공 + IsIslandFlightActive 플래그.
         // 비행 종료 시 OnIslandFlightEnd 발화 → DayCycle 되감기.

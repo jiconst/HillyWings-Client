@@ -23,6 +23,9 @@ namespace HillyWings
         [SerializeField] private int poolSize = 8;
         [SerializeField] private float pickupRadius = 34f;
         [SerializeField] private float flightDuration = 5.5f; // "5,6초 동안 날으는 느낌" 피드백 -- BirdPhysics.StartSkyFlight's arc length
+        // 발사 속도 배율: 1.0 = 대칭 포물선(매우 높음), 낮출수록 최고 높이가 줄어듦.
+        // 높이 ∝ launchScale², 0.6 → 원래 높이의 약 36%
+        [SerializeField] private float skyFlightLaunchScale = 0.6f;
 
         public event Action<Vector3, string, Color> OnPickupPopup;
         // Clean domain event (no visual payload) for HUD's pickup-count box --
@@ -112,7 +115,7 @@ namespace HillyWings
                 field.MarkTaken(i);
                 Vector3 worldPos = ToWorldPos(gm, canvasX, canvasY);
 
-                bird.StartSkyFlight(flightDuration);
+                bird.StartSkyFlight(flightDuration, skyFlightLaunchScale);
                 burst.Burst(worldPos, OrbColor, 14);
                 OnPickupPopup?.Invoke(worldPos, Localization.Get("skyorb.popup"), OrbColor);
                 OnOrbCollected?.Invoke();
