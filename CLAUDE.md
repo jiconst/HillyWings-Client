@@ -1732,3 +1732,49 @@ STATS 하위 탭으로 통합 · 설정 진입 시 로그인/회원가입 선택
 - `dayDuration` **90초 → 65초** (약 28% 단축) — 해가 더 빨리 지도록 해서 긴장감과 쫄깃함 상승
 - 속도 연동(`speedInfluence`), 섬 배율(`islandDayRateScale`), 섬 도달 보상(`islandTimeReward`) 등 나머지 로직은 변경 없음
 - 밸런스 체감 기준값(360 기준 속도): 65초 (이전 90초). 최고 속도(980)에서는 여전히 해가 뒤로 밀림(`rate < 0`)
+
+## 11단계 — 섬 전환 비행 / 풍선 / 오르막 착지 감속 (Post-M10)
+
+### 오르막 착지 즉시 감속 (`Player/BirdPhysics.cs`)
+- 점프 후 착지 순간 경사가 오르막(`slope < -LandingUphillThreshold = -0.03`)이면 `Speed = SpeedMin`으로 즉시 클램프
+- 적용 조건: 유효 체공(`airborneTime >= 0.15초`) 후 착지, sky flight 중 착지 제외
+- 기존 `UphillDecelRate`(연속 감속)와 별개 — "이 착지는 명백히 실패"임을 플레이어가 명확히 체감
+- 상수: `LandingUphillThreshold = 0.03f`
+
+### 섬 전환 비행 (`Core/IslandFlightController.cs`)
+섬 끝 발사대 구간에서 충분한 속도로 날아오르면 "섬 전환 비행"을 발동.
+
+**지형 준비** (`GroundSampler.cs`): 각 섬 경계 앞 `TransitionTriggerDist=2500`에서 골짜기(`-1200`) + 발사대 정점(`-200`)을 자동으로 심어 두어, 발사대에서 `LaunchSlopeThreshold(-0.07)` 충족 시 새가 자연스럽게 하늘로 날아오름.
+
+**IslandFlightController.cs** (신규 MonoBehaviour):
+- 경계 앞 `launchZoneDist=2200` 이내 + 공중 + `speed >= 420` 조건을 만족하면 `bird.StartIslandFlight(5.5초)` 발동
+- 섬당 1회만 발동(`triggeredThisIsland`), `OnIslandAdvanced`/`OnRunStart`마다 리셋
+- 비행 종료 시 `DayCycle.RewindElapsedTime(5초)` 호출 → 낮이 5초 뒤로 후퇴
+
+**BirdController.cs 추가**:
+- `IsIslandFlightActive` bool 프로퍼티 (외부에서 지형 숨김 등에 활용 가능)
+- `OnIslandFlightEnd` 이벤트
+- `StartIslandFlight(float duration)` → `physics.StartSkyFlight(duration)` + 플래그 설정
+- `FixedUpdate`에서 sky flight 종료 감지 → `IsIslandFlightActive = false; OnIslandFlightEnd.Invoke()`
+
+**DayCycle.cs 추가**:
+- `RewindElapsedTime(float seconds)` public 메서드 → `ElapsedTime = Max(0, ElapsedTime - seconds); DayTime = Min(1, ElapsedTime/dayDuration)`
+
+**GameBootstrapper.cs**: `IslandFlightController.Configure(bird, dayCycle)` 연결.
+
+### 풍선 시스템 (`Collectibles/BalloonField.cs`, `Collectibles/BalloonSpawner.cs`)
+Island 2부터 출현하는 풍선. 충돌하면 위로 튀어오르는 반발 점프.
+
+**BalloonField.cs** (순수 데이터):
+- Island 2부터 배치 (`lastBalloonX = Max(startX, 25000)`)
+- 섬 번호 기반 간격: `minGap = Max(1200, 3200 - island*180)`, `maxGap = Max(2000, 5000 - island*200)`
+- 부유 높이: `40 + island*4` ~ `80 + island*6` (지면 위 canvas 거리)
+- 반지름: `Clamp(20 + island*1.5, 20, 36)`
+
+**BalloonSpawner.cs** (풀링 비주얼 + 충돌):
+- 풀 24개, `ProceduralSprite.CreateCircle(32, 분홍색 1f, 0.35f, 0.45f)`
+- 충돌 시: `bird.AddVerticalBoost(-560f)` (canvas-y 음수 = 위쪽) + `AddSpeedBoost(60f)` + 파티클 버스트
+- 팝업: `"POP!"` (분홍색)
+- `BirdPhysics.AddVerticalBoost(float)` 신규: `VerticalVelocity += delta`, 지상이면 강제 Airborne
+- `HUD.BindBalloon(balloonSpawner)` → `OnPickupPopup` 이벤트 연결, `OnDestroy`에서 해제
+- `GameBootstrapper`에서 `seed+5`로 초기화

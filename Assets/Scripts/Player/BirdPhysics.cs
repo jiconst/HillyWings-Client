@@ -54,6 +54,10 @@ namespace HillyWings
         // a genuine ongoing dive isn't punished by terrain jitter.
         public const float MinAirborneTimeForJudging = 0.15f;
 
+        // 점프 후 오르막 착지 임계값: 이 값보다 가파른 오르막에 착지하면 SpeedMin으로 즉시 감속.
+        // 플레이어가 타이밍을 놓치고 올라가는 언덕에 그냥 떨어졌을 때 명확한 패널티를 줌.
+        public const float LandingUphillThreshold = 0.03f;
+
         public float CanvasX { get; }
         public float CanvasY { get; private set; }
         public float VerticalVelocity { get; private set; }
@@ -195,6 +199,12 @@ namespace HillyWings
                         if (holdWasDownhill) JustLandedGreatSlide = true;
                         else JustLandedMiss = true;
                         holdWasDownhill = false;
+
+                        // 오르막 착지: 타이밍을 놓치고 올라가는 경사에 떨어진 경우 즉시 최저 속도.
+                        // 연속 바운스로 에너지를 조금씩 잃는 기존 UphillDecelRate와 별개로
+                        // "이 착지는 명백히 실패"임을 플레이어가 체감할 수 있도록 명확히 감속.
+                        if (!skyFlightActive && slope < -LandingUphillThreshold)
+                            Speed = SpeedMin;
                     }
                     airborneTime = 0f;
                 }
